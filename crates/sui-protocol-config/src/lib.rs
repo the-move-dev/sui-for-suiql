@@ -10,7 +10,7 @@ use tracing::{info, warn};
 
 /// The minimum and maximum protocol versions supported by this build.
 const MIN_PROTOCOL_VERSION: u64 = 1;
-const MAX_PROTOCOL_VERSION: u64 = 20;
+const MAX_PROTOCOL_VERSION: u64 = 21;
 
 // Record history of protocol version allocations here:
 //
@@ -61,9 +61,10 @@ const MAX_PROTOCOL_VERSION: u64 = 20;
 // Version 19: Changes to sui-system package to enable liquid staking.
 //             Add limit for total size of events.
 //             Increase limit for number of events emitted to 1024.
-// Version 20: Enabling the flag `narwhal_new_leader_election_schedule` for the new narwhal leader
+// Version 20: Enables the flag `narwhal_new_leader_election_schedule` for the new narwhal leader
 //             schedule algorithm for enhanced fault tolerance and sets the bad node stake threshold
 //             value. Both values are set for all the environments except mainnet.
+// Version 21: Enables the flag `shared_object_deletion` allowing shared objects to be deleted.
 
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProtocolVersion(u64);
@@ -248,6 +249,10 @@ struct FeatureFlags {
     // If true minimum txn charge is a multiplier of the gas price
     #[serde(skip_serializing_if = "is_false")]
     txn_base_cost_as_multiplier: bool,
+
+    // If true, the ability to delete shared objects is in effect
+    #[serde(skip_serializing_if = "is_false")]
+    shared_object_deletion: bool,
 
     // If true, then the new algorithm for the leader election schedule will be used
     #[serde(skip_serializing_if = "is_false")]
@@ -835,6 +840,10 @@ impl ProtocolConfig {
         self.feature_flags.txn_base_cost_as_multiplier
     }
 
+    pub fn shared_object_deletion(&self) -> bool {
+        self.feature_flags.shared_object_deletion
+    }
+
     pub fn narwhal_new_leader_election_schedule(&self) -> bool {
         self.feature_flags.narwhal_new_leader_election_schedule
     }
@@ -1363,6 +1372,12 @@ impl ProtocolConfig {
 
                 cfg
             }
+            21 => {
+                let mut cfg = Self::get_for_version_impl(version - 1, chain);
+                cfg.feature_flags.shared_object_deletion = true;
+
+                cfg
+            }
 
             // Use this template when making changes:
             //
@@ -1413,7 +1428,6 @@ impl ProtocolConfig {
     pub fn set_zklogin_auth(&mut self, val: bool) {
         self.feature_flags.zklogin_auth = val
     }
-
     pub fn set_upgraded_multisig_for_testing(&mut self, val: bool) {
         self.feature_flags.upgraded_multisig_supported = val
     }

@@ -74,6 +74,23 @@ pub trait Executor {
         Result<Vec<ExecutionResult>, ExecutionError>,
     );
 
+    fn commit_transaction_without_execution(
+        &self,
+        shared_object_refs: Vec<ObjectRef>,
+        temporary_store: TemporaryStore<'_>,
+        transaction_kind: TransactionKind,
+        transaction_signer: SuiAddress,
+        gas_charger: &mut GasCharger,
+        transaction_digest: TransactionDigest,
+        transaction_dependencies: BTreeSet<TransactionDigest>,
+        epoch_id: &EpochId,
+        enable_expensive_checks: bool,
+    ) -> (
+        InnerTemporaryStore,
+        TransactionEffects,
+        Result<(), ExecutionError>,
+    );
+
     fn update_genesis_state(
         &self,
         // Configuration

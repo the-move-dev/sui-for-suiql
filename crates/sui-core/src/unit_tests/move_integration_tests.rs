@@ -1218,9 +1218,9 @@ async fn test_entry_point_vector_error() {
     )
     .await
     .unwrap();
-    // should fail as we do not support shared objects in vectors
+    // support shared objects in vectors
     assert!(
-        matches!(effects.status(), ExecutionStatus::Failure { .. }),
+        matches!(effects.status(), ExecutionStatus::Success { .. }),
         "{:?}",
         effects.status()
     );
@@ -1605,9 +1605,9 @@ async fn test_entry_point_vector_any_error() {
     )
     .await
     .unwrap();
-    // should fail as we do not support shared objects in vectors
+    // support shared objects in vectors
     assert!(
-        matches!(effects.status(), ExecutionStatus::Failure { .. }),
+        matches!(effects.status(), ExecutionStatus::Success { .. }),
         "{:?}",
         effects.status()
     );

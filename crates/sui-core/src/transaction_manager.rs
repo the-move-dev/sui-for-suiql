@@ -497,7 +497,10 @@ impl TransactionManager {
         // So missing objects' availability are checked again after releasing the TM lock.
         let cache_miss_availibility = self
             .authority_store
-            .multi_input_objects_exist(input_object_cache_misses.iter().cloned())
+            .multi_input_objects_exists(
+                input_object_cache_misses.iter().cloned(),
+                epoch_store.epoch(),
+            )
             .expect("Checking object existence cannot fail!")
             .into_iter()
             .zip(input_object_cache_misses.into_iter());

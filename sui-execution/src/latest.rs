@@ -28,6 +28,7 @@ use move_vm_runtime_latest::move_vm::MoveVM;
 use sui_adapter_latest::adapter::{
     default_verifier_config, new_move_vm, run_metered_move_bytecode_verifier,
 };
+use sui_adapter_latest::execution_engine::commit_transaction_without_execution;
 use sui_adapter_latest::execution_engine::execute_transaction_to_effects;
 use sui_adapter_latest::programmable_transactions;
 use sui_adapter_latest::type_layout_resolver::TypeLayoutResolver;
@@ -149,6 +150,35 @@ impl executor::Executor for Executor {
             metrics,
             enable_expensive_checks,
             certificate_deny_set,
+        )
+    }
+
+    fn commit_transaction_without_execution(
+        &self,
+        shared_object_refs: Vec<ObjectRef>,
+        temporary_store: TemporaryStore<'_>,
+        transaction_kind: TransactionKind,
+        transaction_signer: SuiAddress,
+        gas_charger: &mut GasCharger,
+        transaction_digest: TransactionDigest,
+        transaction_dependencies: BTreeSet<TransactionDigest>,
+        epoch_id: &EpochId,
+        enable_expensive_checks: bool,
+    ) -> (
+        InnerTemporaryStore,
+        TransactionEffects,
+        Result<(), ExecutionError>,
+    ) {
+        commit_transaction_without_execution::<execution_mode::Normal>(
+            shared_object_refs,
+            temporary_store,
+            transaction_kind,
+            transaction_signer,
+            gas_charger,
+            transaction_digest,
+            transaction_dependencies,
+            epoch_id,
+            enable_expensive_checks,
         )
     }
 

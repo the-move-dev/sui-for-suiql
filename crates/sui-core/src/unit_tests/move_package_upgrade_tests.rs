@@ -28,6 +28,7 @@ use crate::authority::{
     move_integration_tests::build_and_publish_test_package_with_upgrade_cap, AuthorityState,
 };
 
+#[macro_export]
 macro_rules! move_call {
     {$builder:expr, ($addr:expr)::$module_name:ident::$func:ident($($args:expr),* $(,)?)} => {
         $builder.programmable_move_call(

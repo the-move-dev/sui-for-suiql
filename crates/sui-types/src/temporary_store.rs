@@ -42,6 +42,7 @@ use sui_protocol_config::ProtocolConfig;
 pub type WrittenObjects = BTreeMap<ObjectID, (ObjectRef, Object, WriteKind)>;
 pub type ObjectMap = BTreeMap<ObjectID, Object>;
 pub type TxCoins = (ObjectMap, WrittenObjects);
+pub type DeletedSharedObjects = BTreeMap<ObjectID, SequenceNumber>;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -369,7 +370,6 @@ impl<'backing> TemporaryStore<'backing> {
                 modified_at_versions.push((*id, version));
             }
         });
-
         let protocol_version = self.protocol_config.version;
         let inner = self.into_inner();
 

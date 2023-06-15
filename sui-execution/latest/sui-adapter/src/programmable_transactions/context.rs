@@ -354,6 +354,7 @@ mod checked {
             command_kind: CommandKind<'_>,
             arg: Argument,
         ) -> Result<V, CommandArgumentError> {
+            let shared_obj_deletion_enabled = self.protocol_config.shared_object_deletion();
             let is_borrowed = self.arg_is_borrowed(&arg);
             let (input_metadata_opt, val_opt) = self.borrow_mut(arg, UsageKind::ByValue)?;
             let is_copyable = if let Some(val) = val_opt {
@@ -375,16 +376,42 @@ mod checked {
             {
                 return Err(CommandArgumentError::InvalidGasCoinUsage);
             }
-            // Immutable objects and shared objects cannot be taken by value
+            // Immutable objects cannot be taken by value
             if matches!(
                 input_metadata_opt,
                 Some(InputObjectMetadata {
-                    owner: Owner::Immutable | Owner::Shared { .. },
+                    owner: Owner::Immutable,
                     ..
                 })
             ) {
                 return Err(CommandArgumentError::InvalidObjectByValue);
             }
+            if (
+                // this check can be removed after shared_object_deletion feature flag is removed
+                matches!(
+                    input_metadata_opt,
+                    Some(InputObjectMetadata {
+                        owner: Owner::Shared { .. },
+                        ..
+                    })
+                ) && !shared_obj_deletion_enabled
+            ) {
+                return Err(CommandArgumentError::InvalidObjectByValue);
+            }
+
+            // ensure we don't transfer shared objects to new owners
+            if matches!(
+                input_metadata_opt,
+                Some(InputObjectMetadata {
+                    owner: Owner::Shared { .. },
+                    ..
+                })
+            ) && matches!(command_kind, CommandKind::TransferObjects)
+                && shared_obj_deletion_enabled
+            {
+                return Err(CommandArgumentError::SharedObjectOperationNotAllowed);
+            }
+
             let val = if is_copyable {
                 val_opt.as_ref().unwrap().clone()
             } else {

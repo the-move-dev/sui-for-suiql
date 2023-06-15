@@ -1166,12 +1166,13 @@ impl AuthorityState {
         let _metrics_guard = self.metrics.prepare_certificate_latency.start_timer();
 
         // check_certificate_input also checks shared object locks when loading the shared objects.
-        let (gas_status, input_objects) = transaction_input_checker::check_certificate_input(
-            &self.database,
-            epoch_store,
-            certificate,
-        )
-        .await?;
+        let (gas_status, input_objects, deleted_shared_objects) =
+            transaction_input_checker::check_certificate_input(
+                &self.database,
+                epoch_store,
+                certificate,
+            )
+            .await?;
 
         let owned_object_refs = input_objects.filter_owned_objects();
         self.check_owned_locks(&owned_object_refs).await?;
@@ -1185,10 +1186,13 @@ impl AuthorityState {
             tx_digest,
             protocol_config,
         );
+
         let transaction_data = &certificate.data().intent_message().value;
         let (kind, signer, gas) = transaction_data.execution_parts();
         let mut gas_charger = GasCharger::new(tx_digest, gas, gas_status, protocol_config);
-        let (inner_temp_store, effects, execution_error_opt) =
+
+        let (inner_temp_store, effects, execution_error_opt) = if deleted_shared_objects.is_empty()
+        {
             epoch_store.executor().execute_transaction_to_effects(
                 protocol_config,
                 self.metrics.limits_metrics.clone(),
@@ -1209,7 +1213,21 @@ impl AuthorityState {
                 signer,
                 tx_digest,
                 transaction_dependencies,
-            );
+            )
+        } else {
+            epoch_store.executor().commit_transaction_without_execution(
+                shared_object_refs,
+                temporary_store,
+                kind,
+                signer,
+                &mut gas_charger,
+                tx_digest,
+                transaction_dependencies,
+                &epoch_store.epoch_start_config().epoch_data().epoch_id(),
+                self.expensive_safety_check_config
+                    .enable_deep_per_tx_sui_conservation_check(),
+            )
+        };
 
         Ok((inner_temp_store, effects, execution_error_opt.err()))
     }

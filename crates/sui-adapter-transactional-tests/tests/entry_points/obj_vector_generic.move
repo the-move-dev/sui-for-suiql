@@ -153,7 +153,7 @@ module Test::M {
 //# run Test::M::obj_vec_destroy_any --sender A --type-args Test::M::Any --args vector[object(12,0)]
 
 
-// create an object and pass it both by-value and as element of a vector (failure)
+// create an object and pass it both by-value and as element of a vector
 
 //# run Test::M::mint_any --sender A --type-args Test::M::Any --args 42
 
