@@ -22,8 +22,9 @@ use std::{
 use sui_protocol_config::{check_limit_by_meter, LimitThresholdCrossed, ProtocolConfig};
 use sui_types::{
     base_types::{MoveObjectType, ObjectID, SequenceNumber, SuiAddress},
+    committee::EpochId,
     error::{ExecutionError, ExecutionErrorKind, VMMemoryLimitExceededSubStatusCode},
-    execution::LoadedChildObjectMetadata,
+    execution::LoadedRuntimeObjectMetadata,
     id::UID,
     metrics::LimitsMetrics,
     object::{MoveObject, Owner},
@@ -83,6 +84,7 @@ pub(crate) struct ObjectRuntimeState {
     events: Vec<(Type, StructTag, Value)>,
     // total size of events emitted so far
     total_events_size: u64,
+    received: LinkedHashMap<ObjectID, LoadedRuntimeObjectMetadata>,
 }
 
 #[derive(Clone)]
@@ -168,6 +170,7 @@ impl<'a> ObjectRuntime<'a> {
         is_metered: bool,
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
+        epoch_id: EpochId,
     ) -> Self {
         let mut input_object_owners = BTreeMap::new();
         let mut root_version = BTreeMap::new();
@@ -190,6 +193,7 @@ impl<'a> ObjectRuntime<'a> {
                 is_metered,
                 LocalProtocolConfig::new(protocol_config),
                 metrics.clone(),
+                epoch_id,
             ),
             test_inventories: TestInventories::new(),
             state: ObjectRuntimeState {
@@ -199,6 +203,7 @@ impl<'a> ObjectRuntime<'a> {
                 transfers: LinkedHashMap::new(),
                 events: vec![],
                 total_events_size: 0,
+                received: LinkedHashMap::new(),
             },
             is_metered,
             constants: LocalProtocolConfig::new(protocol_config),
@@ -342,6 +347,31 @@ impl<'a> ObjectRuntime<'a> {
             .object_exists_and_has_type(parent, child, child_type)
     }
 
+    pub(super) fn receive_object(
+        &mut self,
+        parent: ObjectID,
+        child: ObjectID,
+        child_version: SequenceNumber,
+        child_ty: &Type,
+        child_layout: &MoveTypeLayout,
+        child_fully_annotated_layout: &MoveTypeLayout,
+        child_move_type: MoveObjectType,
+    ) -> PartialVMResult<Option<ObjectResult<Value>>> {
+        let Some((value, obj_meta)) = self.child_object_store.receive_object(
+            parent,
+            child,
+            child_version,
+            child_ty,
+            child_layout,
+            child_fully_annotated_layout,
+            child_move_type,
+        )? else {
+            return Ok(None);
+        };
+        self.state.received.insert(child, obj_meta);
+        Ok(Some(value))
+    }
+
     pub(crate) fn get_or_fetch_child_object(
         &mut self,
         parent: ObjectID,
@@ -402,7 +432,7 @@ impl<'a> ObjectRuntime<'a> {
         self.child_object_store.all_active_objects()
     }
 
-    pub fn loaded_child_objects(&self) -> BTreeMap<ObjectID, LoadedChildObjectMetadata> {
+    pub fn loaded_runtime_objects(&self) -> BTreeMap<ObjectID, LoadedRuntimeObjectMetadata> {
         self.child_object_store
             .cached_objects()
             .iter()
@@ -410,14 +440,21 @@ impl<'a> ObjectRuntime<'a> {
                 obj_opt.as_ref().map(|obj| {
                     (
                         *id,
-                        LoadedChildObjectMetadata {
+                        LoadedRuntimeObjectMetadata {
                             version: obj.version(),
                             digest: obj.digest(),
                             storage_rebate: obj.storage_rebate,
+                            previous_transaction: obj.previous_transaction,
                         },
                     )
                 })
             })
+            .chain(
+                self.state
+                    .received
+                    .iter()
+                    .map(|(id, meta)| (*id, meta.clone())),
+            )
             .collect()
     }
 }
@@ -497,6 +534,7 @@ impl ObjectRuntimeState {
             transfers,
             events: user_events,
             total_events_size: _,
+            received,
         } = self;
         // Check new owners from transfers, reports an error on cycles.
         // TODO can we have cycles in the new system?
@@ -505,17 +543,19 @@ impl ObjectRuntimeState {
         let writes: LinkedHashMap<_, _> = transfers
             .into_iter()
             .map(|(id, (owner, type_, value))| {
-                let write_kind =
-                    if input_objects.contains_key(&id) || loaded_child_objects.contains_key(&id) {
-                        debug_assert!(!new_ids.contains_key(&id));
-                        WriteKind::Mutate
-                    } else if id == SUI_SYSTEM_STATE_OBJECT_ID || new_ids.contains_key(&id) {
-                        // SUI_SYSTEM_STATE_OBJECT_ID is only transferred during genesis
-                        // TODO find a way to insert this in the new_ids during genesis transactions
-                        WriteKind::Create
-                    } else {
-                        WriteKind::Unwrap
-                    };
+                let write_kind = if input_objects.contains_key(&id)
+                    || loaded_child_objects.contains_key(&id)
+                    || received.contains_key(&id)
+                {
+                    debug_assert!(!new_ids.contains_key(&id));
+                    WriteKind::Mutate
+                } else if id == SUI_SYSTEM_STATE_OBJECT_ID || new_ids.contains_key(&id) {
+                    // SUI_SYSTEM_STATE_OBJECT_ID is only transferred during genesis
+                    // TODO find a way to insert this in the new_ids during genesis transactions
+                    WriteKind::Create
+                } else {
+                    WriteKind::Unwrap
+                };
                 (id, (write_kind, owner, type_, value))
             })
             .collect();
@@ -524,18 +564,21 @@ impl ObjectRuntimeState {
             .into_iter()
             .map(|(id, ())| {
                 debug_assert!(!new_ids.contains_key(&id));
-                let delete_kind =
-                    if input_objects.contains_key(&id) || loaded_child_objects.contains_key(&id) {
-                        DeleteKind::Normal
-                    } else {
-                        DeleteKind::UnwrapThenDelete
-                    };
+                let delete_kind = if input_objects.contains_key(&id)
+                    || loaded_child_objects.contains_key(&id)
+                    || received.contains_key(&id)
+                {
+                    DeleteKind::Normal
+                } else {
+                    DeleteKind::UnwrapThenDelete
+                };
                 (id, delete_kind)
             })
             .collect();
         // remaining by value objects must be wrapped
         let remaining_by_value_objects = by_value_inputs
             .into_iter()
+            .chain(received.keys().copied())
             .filter(|id| {
                 !writes.contains_key(id)
                     && !deletions.contains_key(id)

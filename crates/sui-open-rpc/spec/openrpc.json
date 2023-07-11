@@ -1365,6 +1365,7 @@
                 "no_extraneous_module_bytes": false,
                 "package_digest_hash_module": false,
                 "package_upgrades": true,
+                "receive_objects": false,
                 "scoring_decision_with_validity_cutoff": true,
                 "simplified_unwrap_then_delete": false,
                 "txn_base_cost_as_multiplier": false,
@@ -1828,6 +1829,7 @@
                 "transfer_freeze_object_cost_base": {
                   "u64": "52"
                 },
+                "transfer_receive_object_cost_base": null,
                 "transfer_share_object_cost_base": {
                   "u64": "52"
                 },

@@ -811,6 +811,7 @@ fn create_genesis_transaction(
         let temporary_store = TemporaryStore::new(
             InMemoryStorage::new(Vec::new()),
             InputObjects::new(vec![]),
+            vec![],
             genesis_digest,
             protocol_config,
         );
@@ -963,6 +964,7 @@ fn process_package(
     let mut temporary_store = TemporaryStore::new(
         store.clone(),
         InputObjects::new(loaded_dependencies),
+        vec![],
         genesis_digest,
         protocol_config,
     );
@@ -1019,6 +1021,7 @@ pub fn generate_genesis_system_object(
     let mut temporary_store = TemporaryStore::new(
         store.clone(),
         InputObjects::new(vec![]),
+        vec![],
         genesis_digest,
         &protocol_config,
     );

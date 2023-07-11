@@ -95,7 +95,7 @@ mod checked {
                 // We still need to record the loaded child objects for replay
                 let loaded_child_objects = object_runtime.loaded_child_objects();
                 drop(context);
-                state_view.save_loaded_child_objects(loaded_child_objects);
+                state_view.save_loaded_runtime_objects(loaded_child_objects);
                 return Err(err.with_command_index(idx));
             };
         }
@@ -108,7 +108,7 @@ mod checked {
         // apply changes
         let finished = context.finish::<Mode>();
         // Save loaded objects for debug. We dont want to lose the info
-        state_view.save_loaded_child_objects(loaded_child_objects);
+        state_view.save_loaded_runtime_objects(loaded_child_objects);
 
         let ExecutionResults {
             object_changes,
@@ -1374,6 +1374,9 @@ mod checked {
                 ty
             }
             Value::Object(obj) => &obj.type_,
+            Value::Receiving(_, _) => {
+                unreachable!("Receiving value should never occur in v0 execution")
+            }
         };
         if ty != param_ty {
             Err(command_argument_error(

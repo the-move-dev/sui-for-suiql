@@ -41,6 +41,7 @@ use std::{
 };
 use sui_config::node::StateDebugDumpConfig;
 use sui_config::NodeConfig;
+use sui_types::execution::LoadedRuntimeObjectMetadata;
 use tap::{TapFallible, TapOptional};
 use tokio::sync::mpsc::unbounded_channel;
 use tokio::sync::oneshot;
@@ -105,7 +106,7 @@ use sui_types::messages_grpc::{
 };
 use sui_types::metrics::{BytecodeVerifierMetrics, LimitsMetrics};
 use sui_types::object::{MoveObject, Owner, PastObjectRead, OBJECT_START_VERSION};
-use sui_types::storage::{ObjectKey, ObjectStore, WriteKind};
+use sui_types::storage::{MarkerKind, ObjectKey, ObjectStore, WriteKind};
 use sui_types::sui_system_state::epoch_start_sui_system_state::EpochStartSystemStateTrait;
 use sui_types::sui_system_state::SuiSystemStateTrait;
 use sui_types::sui_system_state::{get_sui_system_state, SuiSystemState};
@@ -926,6 +927,41 @@ impl AuthorityState {
             .expect("notify_read_effects should return exactly 1 element"))
     }
 
+    fn receiving_object_transaction_dependencies(
+        &self,
+        epoch_store: &AuthorityPerEpochStore,
+        receiving_objects: &[ObjectRef],
+    ) -> SuiResult<Vec<TransactionDigest>> {
+        let mut dependencies = Vec::new();
+        for (oid, version, _) in receiving_objects.iter() {
+            // First try and get the object normally.
+            let previous_transaction = match self.database.get_object_by_key(oid, *version)? {
+                Some(object) => object.previous_transaction,
+                // If the object has already been pruned, we must be receiving it in the epoch it
+                // was deleted (otherwise it would have been rejected at signing before this).
+                // Because of this the transaction digest that we need for the dependency will be
+                // in the per-epoch marker table so get it from there. This should not fail, but if
+                // it does for some reason we will return an error that the the object is not found.
+                None => {
+                    let object_key = (
+                        epoch_store.epoch(),
+                        ObjectKey(*oid, *version),
+                        MarkerKind::Received,
+                    );
+                    let Some(tx_digest) = self.database.perpetual_tables.object_per_epoch_marker_table.get(&object_key)? else {
+                        return Err(SuiError::from(UserInputError::ObjectNotFound {
+                            object_id: *oid,
+                            version: Some(*version),
+                        }));
+                    };
+                    tx_digest
+                }
+            };
+            dependencies.push(previous_transaction);
+        }
+        Ok(dependencies)
+    }
+
     async fn check_owned_locks(&self, owned_object_refs: &[ObjectRef]) -> SuiResult {
         self.database
             .check_owned_object_locks_exist(owned_object_refs)
@@ -1093,7 +1129,16 @@ impl AuthorityState {
         let output_keys: Vec<_> = inner_temporary_store
             .written
             .iter()
-            .map(|(_, ((id, seq, _), obj, _))| InputKey(*id, (!obj.is_package()).then_some(*seq)))
+            .map(|(_, ((id, seq, _), obj, _))| {
+                if obj.is_package() {
+                    InputKey::Package { id: *id }
+                } else {
+                    InputKey::VersionedObject {
+                        id: *id,
+                        version: *seq,
+                    }
+                }
+            })
             .collect();
 
         self.commit_certificate(inner_temporary_store, certificate, effects, epoch_store)
@@ -1178,10 +1223,21 @@ impl AuthorityState {
         let tx_digest = *certificate.digest();
         let protocol_config = epoch_store.protocol_config();
         let shared_object_refs = input_objects.filter_shared_objects();
-        let transaction_dependencies = input_objects.transaction_dependencies();
+        let receiving_objects = certificate
+            .data()
+            .intent_message()
+            .value
+            .receiving_objects()?;
+        let mut transaction_dependencies = input_objects.transaction_dependencies();
+        // Register each receiving object's previous transaction as a dependency regardless of
+        // whether or not we will actually receive it in the transaction.
+        let receiving_object_dependencies =
+            self.receiving_object_transaction_dependencies(epoch_store, &receiving_objects)?;
+        transaction_dependencies.extend(receiving_object_dependencies);
         let temporary_store = TemporaryStore::new(
             self.database.clone(),
             input_objects,
+            receiving_objects,
             tx_digest,
             protocol_config,
         );
@@ -1494,7 +1550,7 @@ impl AuthorityState {
         tx_coins: Option<TxCoins>,
         written: &WrittenObjects,
         module_resolver: &impl GetModule,
-        loaded_child_objects: &BTreeMap<ObjectID, SequenceNumber>,
+        loaded_child_objects: &BTreeMap<ObjectID, LoadedRuntimeObjectMetadata>,
     ) -> SuiResult<u64> {
         let changes = self
             .process_object_index(effects, written, module_resolver)
@@ -1754,7 +1810,7 @@ impl AuthorityState {
                     tx_coins,
                     written,
                     &module_resolver,
-                    &inner_temporary_store.loaded_child_objects,
+                    &inner_temporary_store.loaded_runtime_objects,
                 )
                 .await
                 .tap_ok(|_| self.metrics.post_processing_total_tx_indexed.inc())
@@ -4299,8 +4355,8 @@ impl NodeStateDump {
         // Record all loaded child objects
         // Child objects which are read but not mutated are not tracked anywhere else
         let mut loaded_child_objects = Vec::new();
-        for (id, ver) in &inner_temporary_store.loaded_child_objects {
-            if let Some(w) = authority_store.get_object_by_key(id, *ver)? {
+        for (id, meta) in &inner_temporary_store.loaded_runtime_objects {
+            if let Some(w) = authority_store.get_object_by_key(id, meta.version)? {
                 loaded_child_objects.push(w)
             }
         }

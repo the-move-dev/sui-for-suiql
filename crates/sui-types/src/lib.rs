@@ -66,6 +66,7 @@ pub mod sui_serde;
 pub mod sui_system_state;
 pub mod temporary_store;
 pub mod transaction;
+pub mod transfer;
 pub mod type_resolver;
 pub mod versioned;
 pub mod zk_login_authenticator;
@@ -196,7 +197,7 @@ pub fn is_primitive(
 
         S::StructInstantiation(idx, targs) => {
             let resolved_struct = resolve_struct(view, *idx);
-            // is option of a primitive
+            // option is a primitive
             resolved_struct == RESOLVED_STD_OPTION
                 && targs.len() == 1
                 && is_primitive(view, function_type_args, &targs[0])

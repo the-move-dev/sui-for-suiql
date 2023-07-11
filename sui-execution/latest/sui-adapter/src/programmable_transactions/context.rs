@@ -31,7 +31,6 @@ mod checked {
         self, get_all_uids, max_event_error, ObjectRuntime, RuntimeResults,
     };
     use sui_protocol_config::ProtocolConfig;
-    use sui_types::gas::GasCharger;
     use sui_types::{
         balance::Balance,
         base_types::{MoveObjectType, ObjectID, SequenceNumber, SuiAddress, TxContext},
@@ -51,6 +50,7 @@ mod checked {
         transaction::{Argument, CallArg, ObjectArg},
         type_resolver::TypeTagResolver,
     };
+    use sui_types::{committee::EpochId, gas::GasCharger};
     use sui_types::{
         error::command_argument_error,
         execution::{CommandKind, ObjectContents, TryFromValue, Value},
@@ -130,6 +130,7 @@ mod checked {
                 !gas_charger.is_unmetered(),
                 protocol_config,
                 metrics.clone(),
+                tx_context.epoch(),
             );
             let mut input_object_map = BTreeMap::new();
             let inputs = inputs
@@ -196,6 +197,7 @@ mod checked {
                 !gas_charger.is_unmetered(),
                 protocol_config,
                 metrics.clone(),
+                tx_context.epoch(),
             );
 
             // Set the profiler if in debug mode
@@ -378,7 +380,7 @@ mod checked {
             // Immutable objects and shared objects cannot be taken by value
             if matches!(
                 input_metadata_opt,
-                Some(InputObjectMetadata {
+                Some(InputObjectMetadata::InputObject {
                     owner: Owner::Immutable | Owner::Shared { .. },
                     ..
                 })
@@ -422,7 +424,11 @@ mod checked {
                 // error if taken
                 return Err(CommandArgumentError::InvalidValueUsage);
             };
-            if input_metadata_opt.is_some() && !input_metadata_opt.unwrap().is_mutable_input {
+            if let Some(InputObjectMetadata::InputObject {
+                is_mutable_input: false,
+                ..
+            }) = input_metadata_opt
+            {
                 return Err(CommandArgumentError::InvalidObjectByMutRef);
             }
             // if it is copyable, don't take it as we allow for the value to be copied even if
@@ -479,15 +485,28 @@ mod checked {
             The take+restore is an implementation detail of mutable references"
             );
             // restore is exclusively used for mut
-            let Ok((_, value_opt)) = self.borrow_mut_impl(arg, None) else {
+            let Ok((input_object_metadata, value_opt)) = self.borrow_mut_impl(arg, None) else {
                 invariant_violation!("Should be able to borrow argument to restore it")
             };
-            let old_value = value_opt.replace(value);
-            assert_invariant!(
-                old_value.is_none() || old_value.unwrap().is_copyable(),
-                "Should never restore a non-taken value, unless it is copyable. \
+            match input_object_metadata {
+                Some(InputObjectMetadata::Receiving { id, version }) => {
+                    let old_value = value_opt.replace(Value::Receiving(*id, *version));
+                    // If the value is receiving and it's being restored it must have been taken since
+                    // the `Receiving` struct is not copy.
+                    assert_invariant!(
+                        old_value.is_none(),
+                        "Should never restore a receiving value without having taken it"
+                    );
+                }
+                _ => {
+                    let old_value = value_opt.replace(value);
+                    assert_invariant!(
+                        old_value.is_none() || old_value.unwrap().is_copyable(),
+                        "Should never restore a non-taken value, unless it is copyable. \
             The take+restore is an implementation detail of mutable references"
-            );
+                    );
+                }
+            }
             Ok(())
         }
 
@@ -583,11 +602,22 @@ mod checked {
                     object_metadata: object_metadata_opt,
                     inner: ResultValue { value, .. },
                 } = input;
+
                 let Some(object_metadata) = object_metadata_opt else { return Ok(()) };
-                let is_mutable_input = object_metadata.is_mutable_input;
-                let owner = object_metadata.owner;
-                let id = object_metadata.id;
-                input_object_metadata.insert(object_metadata.id, object_metadata);
+                let (id, owner_opt, is_mutable_input) = match &object_metadata {
+                    InputObjectMetadata::InputObject {
+                        id,
+                        owner,
+                        is_mutable_input,
+                        ..
+                    } => (*id, Some(*owner), *is_mutable_input),
+                    InputObjectMetadata::Receiving { id, .. } => (*id, None, false),
+                };
+                input_object_metadata.insert(id, object_metadata);
+                let Some(owner) = owner_opt else {
+                return Ok(())
+            };
+
                 let Some(Value::Object(object_value)) = value else {
                     by_value_inputs.insert(id);
                     return Ok(())
@@ -597,7 +627,7 @@ mod checked {
                 }
                 Ok(())
             };
-            let gas_id_opt = gas.object_metadata.as_ref().map(|info| info.id);
+            let gas_id_opt = gas.object_metadata.as_ref().map(|info| info.id());
             add_input_object_write(gas)?;
             for input in inputs {
                 add_input_object_write(input)?
@@ -647,6 +677,8 @@ mod checked {
                                     ));
                                 }
                             }
+                            // Receiving arguments can be dropped without being received
+                            Some(Value::Receiving(_, _)) => (),
                         }
                     }
                 }
@@ -701,6 +733,7 @@ mod checked {
                 !gas_charger.is_unmetered(),
                 protocol_config,
                 metrics,
+                tx_context.epoch(),
             );
             for (id, additional_write) in additional_writes {
                 let AdditionalWrite {
@@ -781,10 +814,10 @@ mod checked {
                         let old_version = match input_object_metadata.get(&id) {
                             Some(metadata) => {
                                 assert_invariant!(
-                                    !matches!(metadata.owner, Owner::Immutable),
+                                !matches!(metadata, InputObjectMetadata::InputObject { owner: Owner::Immutable, .. }),
                                     "Attempting to delete immutable object {id} via delete kind {delete_kind}"
                                 );
-                                metadata.version
+                            metadata.version()
                             }
                             None => {
                                 match loaded_child_objects.get(&id) {
@@ -926,6 +959,7 @@ mod checked {
         is_metered: bool,
         protocol_config: &ProtocolConfig,
         metrics: Arc<LimitsMetrics>,
+        current_epoch_id: EpochId,
     ) -> Session<'state, 'vm, LinkageView<'state>> {
         vm.new_session_with_extensions(
             linkage,
@@ -935,6 +969,7 @@ mod checked {
                 is_metered,
                 protocol_config,
                 metrics,
+                current_epoch_id,
             ),
         )
     }
@@ -1146,7 +1181,7 @@ mod checked {
         };
         let owner = obj.owner;
         let version = obj.version();
-        let object_metadata = InputObjectMetadata {
+        let object_metadata = InputObjectMetadata::InputObject {
             id,
             is_mutable_input,
             owner,
@@ -1219,6 +1254,9 @@ mod checked {
                 /* imm override */ !mutable,
                 id,
             ),
+            ObjectArg::Receiving((id, version, _)) => {
+                Ok(InputValue::new_receiving_object(id, version))
+            }
         }
     }
 
@@ -1307,12 +1345,12 @@ mod checked {
         );
 
         let old_obj_ver = metadata_opt
-            .map(|metadata| metadata.version)
+            .map(|metadata| metadata.version())
             .or_else(|| loaded_child_version_opt.copied());
 
         debug_assert!(
             (write_kind == WriteKind::Mutate) == old_obj_ver.is_some(),
-            "Inconsistent state: write_kind: {write_kind:?}, old ver: {old_obj_ver:?}"
+            "Inconsistent state: write_kind: {write_kind:?}, old ver: {old_obj_ver:?} id: {id:?}"
         );
 
         let type_tag = session

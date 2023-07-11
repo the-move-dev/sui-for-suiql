@@ -125,7 +125,8 @@ pub struct AuthorityPerpetualTables {
     /// objects (since they are not locked by the transaction manager) and for tracking shared
     /// objects that have been deleted. This table is meant to be pruned per-epoch, and all
     /// previous epochs other than the current epoch may be pruned safely.
-    pub(crate) object_per_epoch_marker_table: DBMap<(EpochId, ObjectKey, MarkerKind), ()>,
+    pub(crate) object_per_epoch_marker_table:
+        DBMap<(EpochId, ObjectKey, MarkerKind), TransactionDigest>,
 }
 
 impl AuthorityPerpetualTables {

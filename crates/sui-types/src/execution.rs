@@ -15,11 +15,12 @@ use serde::Deserialize;
 use crate::{
     base_types::{ObjectID, SequenceNumber, SuiAddress},
     coin::Coin,
-    digests::ObjectDigest,
+    digests::{ObjectDigest, TransactionDigest},
     error::{ExecutionError, ExecutionErrorKind, SuiError},
     execution_status::CommandArgumentError,
     object::Owner,
     storage::{BackingPackageStore, ChildObjectResolver, ObjectChange, StorageView},
+    transfer::Receiving,
 };
 
 pub trait SuiResolver:
@@ -74,18 +75,25 @@ pub struct ExecutionResults {
 }
 
 #[derive(Clone, Debug)]
-pub struct InputObjectMetadata {
-    pub id: ObjectID,
-    pub is_mutable_input: bool,
-    pub owner: Owner,
-    pub version: SequenceNumber,
+pub enum InputObjectMetadata {
+    Receiving {
+        id: ObjectID,
+        version: SequenceNumber,
+    },
+    InputObject {
+        id: ObjectID,
+        is_mutable_input: bool,
+        owner: Owner,
+        version: SequenceNumber,
+    },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct LoadedChildObjectMetadata {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoadedRuntimeObjectMetadata {
     pub version: SequenceNumber,
     pub digest: ObjectDigest,
     pub storage_rebate: u64,
+    pub previous_transaction: TransactionDigest,
 }
 
 #[derive(Clone, Debug)]
@@ -115,6 +123,7 @@ pub enum UsageKind {
 pub enum Value {
     Object(ObjectValue),
     Raw(RawValueType, Vec<u8>),
+    Receiving(ObjectID, SequenceNumber),
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +168,22 @@ pub enum CommandKind<'a> {
     Upgrade,
 }
 
+impl InputObjectMetadata {
+    pub fn id(&self) -> ObjectID {
+        match self {
+            InputObjectMetadata::Receiving { id, .. } => *id,
+            InputObjectMetadata::InputObject { id, .. } => *id,
+        }
+    }
+
+    pub fn version(&self) -> SequenceNumber {
+        match self {
+            InputObjectMetadata::Receiving { version, .. } => *version,
+            InputObjectMetadata::InputObject { version, .. } => *version,
+        }
+    }
+}
+
 impl InputValue {
     pub fn new_object(object_metadata: InputObjectMetadata, value: ObjectValue) -> Self {
         InputValue {
@@ -171,6 +196,13 @@ impl InputValue {
         InputValue {
             object_metadata: None,
             inner: ResultValue::new(Value::Raw(ty, value)),
+        }
+    }
+
+    pub fn new_receiving_object(id: ObjectID, version: SequenceNumber) -> Self {
+        InputValue {
+            object_metadata: Some(InputObjectMetadata::Receiving { id, version }),
+            inner: ResultValue::new(Value::Receiving(id, version)),
         }
     }
 }
@@ -190,6 +222,7 @@ impl Value {
             Value::Object(_) => false,
             Value::Raw(RawValueType::Any, _) => true,
             Value::Raw(RawValueType::Loaded { abilities, .. }, _) => abilities.has_copy(),
+            Value::Receiving(_, _) => false,
         }
     }
 
@@ -197,6 +230,9 @@ impl Value {
         match self {
             Value::Object(obj_value) => obj_value.write_bcs_bytes(buf),
             Value::Raw(_, bytes) => buf.extend(bytes),
+            Value::Receiving(id, version) => {
+                buf.extend(&Receiving::new(*id, *version).to_bcs_bytes())
+            }
         }
     }
 
@@ -213,6 +249,9 @@ impl Value {
                 },
                 _,
             ) => *used_in_non_entry_move_call,
+            // Only thing you can do with a `Receiving<T>` is consume it, so once it's used it
+            // can't be used again.
+            Value::Receiving(_, _) => false,
         }
     }
 }
@@ -260,6 +299,7 @@ impl TryFromValue for ObjectValue {
             Value::Object(o) => Ok(o),
             Value::Raw(RawValueType::Any, _) => Err(CommandArgumentError::TypeMismatch),
             Value::Raw(RawValueType::Loaded { .. }, _) => Err(CommandArgumentError::TypeMismatch),
+            Value::Receiving(_, _) => Err(CommandArgumentError::TypeMismatch),
         }
     }
 }
@@ -282,6 +322,7 @@ fn try_from_value_prim<'a, T: Deserialize<'a>>(
 ) -> Result<T, CommandArgumentError> {
     match value {
         Value::Object(_) => Err(CommandArgumentError::TypeMismatch),
+        Value::Receiving(_, _) => Err(CommandArgumentError::TypeMismatch),
         Value::Raw(RawValueType::Any, bytes) => {
             bcs::from_bytes(bytes).map_err(|_| CommandArgumentError::InvalidBCSBytes)
         }

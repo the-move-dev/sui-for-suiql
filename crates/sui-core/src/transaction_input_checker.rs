@@ -62,9 +62,11 @@ mod checked {
         transaction.check_version_supported(epoch_store.protocol_config())?;
         transaction.validity_check(epoch_store.protocol_config())?;
         let input_objects = transaction.input_objects()?;
+        let receiving_objects = transaction.receiving_objects()?;
         transaction_signing_filter::check_transaction_for_signing(
             transaction,
             &input_objects,
+            &receiving_objects,
             transaction_deny_config,
             store,
         )?;
@@ -80,6 +82,7 @@ mod checked {
         let gas_status =
             get_gas_status(&objects, transaction.gas(), epoch_store, transaction).await?;
         let input_objects = check_objects(transaction, input_objects, objects)?;
+        store.check_receiving_objects(&receiving_objects, input_objects.len(), epoch_store)?;
         Ok((gas_status, input_objects))
     }
 
@@ -97,6 +100,7 @@ mod checked {
             epoch_store.protocol_config(),
             metrics,
         )?;
+        let receiving_objects = transaction.receiving_objects()?;
         let mut input_objects = transaction.input_objects()?;
         let mut objects =
             store.check_input_objects(&input_objects, epoch_store.protocol_config())?;
@@ -108,6 +112,7 @@ mod checked {
         let gas_status =
             get_gas_status(&objects, &[gas_object_ref], epoch_store, transaction).await?;
         let input_objects = check_objects(transaction, input_objects, objects)?;
+        store.check_receiving_objects(&receiving_objects, input_objects.len(), epoch_store)?;
         Ok((gas_status, input_objects))
     }
 
@@ -172,6 +177,7 @@ mod checked {
         );
 
         let tx_data = &cert.data().intent_message().value;
+        let receiving_objects = tx_data.receiving_objects()?;
         let input_object_kinds = tx_data.input_objects()?;
         let input_object_data = if tx_data.is_change_epoch_tx() {
             // When changing the epoch, we update a the system object, which is shared, without going
@@ -183,6 +189,7 @@ mod checked {
         let gas_status =
             get_gas_status(&input_object_data, tx_data.gas(), epoch_store, tx_data).await?;
         let input_objects = check_objects(tx_data, input_object_kinds, input_object_data)?;
+        store.check_receiving_objects(&receiving_objects, input_objects.len(), epoch_store)?;
         Ok((gas_status, input_objects))
     }
 

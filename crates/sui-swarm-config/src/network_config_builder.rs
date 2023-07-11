@@ -394,6 +394,7 @@ mod test {
         let temporary_store = TemporaryStore::new(
             InMemoryStorage::new(Vec::new()),
             InputObjects::new(vec![]),
+            vec![],
             genesis_digest,
             &protocol_config,
         );
