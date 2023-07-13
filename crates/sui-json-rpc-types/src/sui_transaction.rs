@@ -1536,12 +1536,12 @@ impl SuiCallArg {
                 mutable,
             }),
             CallArg::Object(ObjectArg::Receiving((object_id, version, digest))) => {
-                 SuiCallArg::Object(SuiObjectArg::Receiving {
+                SuiCallArg::Object(SuiObjectArg::Receiving {
                     object_id,
                     version,
                     digest,
-                 })
-             }
+                })
+            }
         })
     }
 
@@ -1555,10 +1555,8 @@ impl SuiCallArg {
     pub fn object(&self) -> Option<&ObjectID> {
         match self {
             SuiCallArg::Object(SuiObjectArg::SharedObject { object_id, .. })
-            | SuiCallArg::Object(SuiObjectArg::ImmOrOwnedObject { object_id, .. }) 
-            | SuiCallArg::Object(SuiObjectArg::Receiving{ object_id, ..}) => {
-                Some(object_id)
-            }
+            | SuiCallArg::Object(SuiObjectArg::ImmOrOwnedObject { object_id, .. })
+            | SuiCallArg::Object(SuiObjectArg::Receiving { object_id, .. }) => Some(object_id),
             _ => None,
         }
     }
