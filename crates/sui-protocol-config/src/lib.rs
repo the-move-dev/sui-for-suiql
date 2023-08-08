@@ -257,6 +257,9 @@ struct FeatureFlags {
     // A list of supported OIDC providers that can be used for zklogin.
     #[serde(skip_serializing_if = "is_empty")]
     zklogin_supported_providers: BTreeSet<String>,
+
+    #[serde(skip_serializing_if = "is_false")]
+    enable_jwk_consensus_updates: bool,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -848,6 +851,10 @@ impl ProtocolConfig {
 
     pub fn narwhal_new_leader_election_schedule(&self) -> bool {
         self.feature_flags.narwhal_new_leader_election_schedule
+    }
+
+    pub fn enable_jwk_consensus_updates(&self) -> bool {
+        self.feature_flags.enable_jwk_consensus_updates
     }
 }
 

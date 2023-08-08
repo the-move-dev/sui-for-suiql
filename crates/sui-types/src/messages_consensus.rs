@@ -26,6 +26,23 @@ pub struct ConsensusCommitPrologue {
     pub commit_timestamp_ms: CheckpointTimestamp,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+pub enum AuthenticatorStateUpdate {
+    AddOAuthProviderContentV1(OAuthProviderContent),
+}
+
+/// Struct that contains all the OAuth provider information. A list of them can
+/// be retrieved from the JWK endpoint (e.g. <https://www.googleapis.com/oauth2/v3/certs>)
+/// and published on the bulletin along with a trusted party's signature.
+#[derive(Debug, Clone, PartialEq, Eq, JsonSchema, Hash, Serialize, Deserialize)]
+pub struct OAuthProviderContent {
+    kty: String,
+    kid: String,
+    pub e: String,
+    pub n: String,
+    alg: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ConsensusTransaction {
     /// Encodes an u64 unique tracking id to allow us trace a message between Sui and Narwhal.
