@@ -4,16 +4,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { DAppPermissionsList } from '../../components/DAppPermissionsList';
-import { SummaryCard } from '../../components/SummaryCard';
-import { WalletListSelect } from '../../components/WalletListSelect';
+import { AccountMultiSelectWithControls } from '../../components/accounts/AccountMultiSelect';
+import { useAccounts } from '../../hooks/useAccounts';
+import { useActiveAccount } from '../../hooks/useActiveAccount';
+
 import { PageMainLayoutTitle } from '../../shared/page-main-layout/PageMainLayoutTitle';
+
 import Loading from '_components/loading';
 import { UserApproveContainer } from '_components/user-approve-container';
-import { useActiveAddress, useAppDispatch, useAppSelector } from '_hooks';
+import { useAppDispatch, useAppSelector } from '_hooks';
 import { permissionsSelectors, respondToPermissionRequest } from '_redux/slices/permissions';
-import { ampli } from '_src/shared/analytics/ampli';
 
+import { type SerializedUIAccount } from '_src/background/accounts/Account';
+import { ampli } from '_src/shared/analytics/ampli';
 import type { RootState } from '_redux/RootReducer';
 
 import st from './SiteConnectPage.module.scss';
@@ -29,9 +32,10 @@ function SiteConnectPage() {
 	);
 	const dispatch = useAppDispatch();
 	const permissionRequest = useAppSelector(permissionSelector);
-	const activeAddress = useActiveAddress();
-	const [accountsToConnect, setAccountsToConnect] = useState<string[]>(() =>
-		activeAddress ? [activeAddress] : [],
+	const activeAccount = useActiveAccount();
+	const { data: accounts } = useAccounts();
+	const [accountsToConnect, setAccountsToConnect] = useState<SerializedUIAccount[]>(() =>
+		activeAccount ? [activeAccount] : [],
 	);
 	const handleOnSubmit = useCallback(
 		async (allowed: boolean) => {
@@ -39,7 +43,7 @@ function SiteConnectPage() {
 				await dispatch(
 					respondToPermissionRequest({
 						id: requestID,
-						accounts: allowed ? accountsToConnect : [],
+						accounts: allowed ? accountsToConnect.map((account) => account.address) : [],
 						allowed,
 					}),
 				);
@@ -112,6 +116,7 @@ function SiteConnectPage() {
 					<UserApproveContainer
 						origin={permissionRequest.origin}
 						originFavIcon={permissionRequest.favIcon}
+						permissions={permissionRequest.permissions}
 						approveTitle="Connect"
 						rejectTitle="Reject"
 						onSubmit={handleOnSubmit}
@@ -119,16 +124,15 @@ function SiteConnectPage() {
 						blended
 					>
 						<PageMainLayoutTitle title="Approve Connection" />
-						<SummaryCard
-							header="Permissions requested"
-							body={<DAppPermissionsList permissions={permissionRequest.permissions} />}
-							boxShadow
-						/>
-						<WalletListSelect
-							title="Connect Accounts"
-							values={accountsToConnect}
-							onChange={setAccountsToConnect}
-							boxShadow
+
+						<AccountMultiSelectWithControls
+							selectedAccountIDs={accountsToConnect.map((account) => account.address)}
+							accounts={accounts ?? []}
+							onChange={(value) => {
+								setAccountsToConnect(
+									value.map((address) => accounts?.find((a) => a.address === address)!),
+								);
+							}}
 						/>
 					</UserApproveContainer>
 				))}

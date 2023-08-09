@@ -2319,7 +2319,7 @@ version = "3.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea0c8bce528c4be4da13ea6fead8965e95b6073585a2f05204bd8f4119f82a65"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro-error",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
@@ -2332,7 +2332,7 @@ version = "4.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8cd2b2a819ad6eec39e8f1d6b53001af1e5469f8c177579cdaeb313115b825f"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
  "syn 2.0.16",
@@ -3161,7 +3161,7 @@ version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b10c03b954333d05bfd5be1d8a74eae2c9ca77b86e0f1c3a1ea29c49da1d6c2"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
  "syn 1.0.107",
@@ -4299,9 +4299,9 @@ dependencies = [
 
 [[package]]
 name = "heck"
-version = "0.4.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
+checksum = "2540771e65fc8cb83cd6e8a237f70c319bd5c29f78ed1084ba5d50eeac86f7f9"
 
 [[package]]
 name = "hermit-abi"
@@ -4940,7 +4940,7 @@ name = "jsonrpsee-proc-macros"
 version = "0.16.2"
 source = "git+https://github.com/wlmyng/jsonrpsee.git?rev=b1b300784795f6a64d0fcdf8f03081a9bc38bde8#b1b300784795f6a64d0fcdf8f03081a9bc38bde8"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro-crate",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
@@ -7907,7 +7907,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c828f93f5ca4826f97fedcbd3f9a536c16b12cff3dbbb4a007f932bbad95b12"
 dependencies = [
  "bytes",
- "heck 0.4.1",
+ "heck 0.4.0",
  "itertools",
  "lazy_static",
  "log",
@@ -9414,7 +9414,7 @@ version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "475b3bbe5245c26f2d8a6f62d67c1f30eb9fffeccee721c45d162c3ebbdf81b2"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
  "syn 1.0.107",
@@ -9578,7 +9578,7 @@ version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
  "rustversion",
@@ -11722,7 +11722,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99f688a08b54f4f02f0a3c382aefdb7884d3d69609f785bd253dc033243e3fe4"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.4.0",
  "proc-macro-error",
  "proc-macro2 1.0.58",
  "quote 1.0.26",
@@ -13693,7 +13693,7 @@ dependencies = [
  "headers",
  "headers-core",
  "heck 0.3.3",
- "heck 0.4.1",
+ "heck 0.4.0",
  "hex",
  "hex-literal",
  "hkdf",
