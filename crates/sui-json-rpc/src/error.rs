@@ -60,6 +60,9 @@ pub enum Error {
     // TODO(wlmyng): convert StateReadError::Internal message to generic internal error message.
     #[error(transparent)]
     StateReadError(#[from] StateReadError),
+
+    #[error("Unsupported Feature: {0}")]
+    UnsupportedFeature(String),
 }
 
 impl From<Error> for RpcError {
@@ -73,6 +76,10 @@ impl From<SuiError> for Error {
         match e {
             SuiError::UserInputError { error } => Self::UserInputError(error),
             SuiError::SuiObjectResponseError { error } => Self::SuiObjectResponseError(error),
+            SuiError::UnsupportedFeatureError { error } => Self::UnsupportedFeature(error),
+            SuiError::IndexStoreNotAvailable => Self::UnsupportedFeature(
+                "Required indexes are not available on this node".to_string(),
+            ),
             other => Self::SuiError(other),
         }
     }
@@ -83,6 +90,7 @@ impl Error {
     pub fn to_rpc_error(self) -> RpcError {
         match self {
             Error::UserInputError(_) => RpcError::Call(CallError::InvalidParams(self.into())),
+            Error::UnsupportedFeature(_) => RpcError::Call(CallError::InvalidParams(self.into())),
             Error::SuiObjectResponseError(err) => match err {
                 SuiObjectResponseError::NotExists { .. }
                 | SuiObjectResponseError::DynamicFieldNotFound { .. }
