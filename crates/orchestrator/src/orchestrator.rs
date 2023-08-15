@@ -532,7 +532,7 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
             display::status(format!("{}/{}", i + 1, clients.len()));
 
             let connection = self.ssh_manager.connect(instance.ssh_address()).await?;
-            let client_log_content = connection.download("client.log")?;
+            let client_log_content = connection.download("client.log").await?;
 
             let client_log_file = [path.clone(), format!("client-{i}.log").into()]
                 .iter()
@@ -551,7 +551,7 @@ impl<P: ProtocolCommands<T> + ProtocolMetrics, T: BenchmarkType> Orchestrator<P,
             display::status(format!("{}/{}", i + 1, nodes.len()));
 
             let connection = self.ssh_manager.connect(instance.ssh_address()).await?;
-            let node_log_content = connection.download("node.log")?;
+            let node_log_content = connection.download("node.log").await?;
 
             let node_log_file = [path.clone(), format!("node-{i}.log").into()]
                 .iter()

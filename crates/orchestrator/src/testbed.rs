@@ -242,7 +242,13 @@ impl<C: ServerProviderClient> Testbed<C> {
                 .filter(|x| instances_ids.contains(&x.id))
                 .map(|instance| {
                     let private_key_file = self.settings.ssh_private_key_file.clone();
-                    SshConnection::new(instance.ssh_address(), C::USERNAME, private_key_file)
+                    SshConnection::new(
+                        instance.ssh_address(),
+                        C::USERNAME,
+                        private_key_file,
+                        None,
+                        None,
+                    )
                 });
             if try_join_all(futures).await.is_ok() {
                 break;

@@ -13,7 +13,7 @@ use std::{
 use futures::future::try_join_all;
 use russh::client::Msg;
 use russh::{client, Channel};
-use russh_keys::{key};
+use russh_keys::key;
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
@@ -140,8 +140,16 @@ impl SshConnectionManager {
     pub async fn connect(&self, address: SocketAddr) -> SshResult<SshConnection> {
         let mut error = None;
         for _ in 0..self.retries + 1 {
-            match SshConnection::new(address, &self.username, self.private_key_file.clone()).await {
-                Ok(x) => return Ok(x.with_timeout(&self.timeout).with_retries(self.retries)),
+            match SshConnection::new(
+                address,
+                &self.username,
+                self.private_key_file.clone(),
+                self.timeout,
+                Some(self.retries),
+            )
+            .await
+            {
+                Ok(x) => return Ok(x),
                 Err(e) => error = Some(e),
             }
             sleep(Self::RETRY_DELAY).await;
@@ -270,10 +278,10 @@ impl SshConnectionManager {
     }
 }
 
-struct Client {}
+struct Session {}
 
 #[async_trait]
-impl client::Handler for Client {
+impl client::Handler for Session {
     type Error = russh::Error;
 
     async fn check_server_key(
@@ -287,7 +295,7 @@ impl client::Handler for Client {
 /// Representation of an ssh connection.
 pub struct SshConnection {
     /// The ssh session.
-    session: client::Handle<Client>,
+    session: client::Handle<Session>,
     /// The host address.
     address: SocketAddr,
     /// The number of retries before giving up to execute the command.
@@ -303,17 +311,18 @@ impl SshConnection {
         address: SocketAddr,
         username: &str,
         private_key_file: P,
+        connection_timeout: Option<Duration>,
+        retries: Option<usize>,
     ) -> SshResult<Self> {
         let key = russh_keys::load_secret_key(private_key_file, None)
             .map_err(|error| SshError::PrivateKeyError { address, error })?;
 
         let config = client::Config {
-            connection_timeout: Some(Self::DEFAULT_TIMEOUT),
+            connection_timeout: connection_timeout.or(Some(Self::DEFAULT_TIMEOUT)),
             ..<_>::default()
         };
 
-        let sh = Client {};
-        let mut session = client::connect(Arc::new(config), address, sh)
+        let mut session = client::connect(Arc::new(config), address, Session {})
             .await
             .map_err(|error| SshError::ConnectionError { address, error })?;
 
@@ -325,28 +334,8 @@ impl SshConnection {
         Ok(Self {
             session,
             address,
-            retries: 0,
+            retries: retries.unwrap_or_default(),
         })
-    }
-
-    /// Set a timeout for the ssh connection. If no timeouts are specified, reset it to the
-    /// default value.
-    pub fn with_timeout(self, _timeout: &Option<Duration>) -> Self {
-        /*
-        let duration = match timeout {
-            Some(value) => value,
-            None => &Self::DEFAULT_TIMEOUT,
-        };
-        self.session.set_timeout(duration.as_millis() as u32);
-
-         */
-        self
-    }
-
-    /// Set the maximum number of times to retries to establish a connection and execute commands.
-    pub fn with_retries(mut self, retries: usize) -> Self {
-        self.retries = retries;
-        self
     }
 
     /// Make a useful session error from the lower level error message.
@@ -356,15 +345,6 @@ impl SshConnection {
             error,
         }
     }
-
-    /*
-    /// Make a useful connection error from the lower level error message.
-    fn make_connection_error(&self, error: std::io::Error) -> SshError {
-        SshError::ConnectionError {
-            address: self.address,
-            error,
-        }
-    }*/
 
     /// Execute a ssh command on the remote machine.
     pub async fn execute(&self, command: String) -> SshResult<(String, String)> {
@@ -426,58 +406,19 @@ impl SshConnection {
         Ok((output_str.clone(), output_str))
     }
 
-    /*
-    /// Upload a file to the remote machines through scp.
-    #[allow(dead_code)]
-    pub fn upload<P: AsRef<Path>>(&self, path: P, content: &[u8]) -> SshResult<()> {
-        let size = content.len() as u64;
+    /// Download a file from the remote machines by doing a silly cat on the file.
+    /// TODO: if the files get too big then we should leverage a simple S3 bucket instead.
+    pub async fn download<P: AsRef<Path>>(&self, path: P) -> SshResult<String> {
         let mut error = None;
         for _ in 0..self.retries + 1 {
-            let mut channel = match self.session.scp_send(path.as_ref(), 0o644, size, None) {
-                Ok(x) => x,
-                Err(e) => {
-                    error = Some(self.make_session_error(e));
-                    continue;
-                }
-            };
-            match channel
-                .write_all(content)
-                .map_err(|e| self.make_connection_error(e))
+            match self
+                .execute(format!("cat {}", path.as_ref().to_str().unwrap()))
+                .await
             {
-                r @ Ok(..) => return r,
-                Err(e) => error = Some(e),
+                Ok((file_data, _)) => return Ok(file_data),
+                Err(err) => error = Some(err),
             }
         }
         Err(error.unwrap())
-    }
-
-     */
-
-    /// Download a file from the remote machines through scp.
-    pub fn download<P: AsRef<Path>>(&self, _path: P) -> SshResult<String> {
-        /*
-        let mut error = None;
-        for _ in 0..self.retries + 1 {
-            let (mut channel, _stats) = match self.session.scp_recv(path.as_ref()) {
-                Ok(x) => x,
-                Err(e) => {
-                    error = Some(self.make_session_error(e));
-                    continue;
-                }
-            };
-
-            let mut content = String::new();
-            match channel
-                .read_to_string(&mut content)
-                .map_err(|e| self.make_connection_error(e))
-            {
-                Ok(..) => return Ok(content),
-                Err(e) => error = Some(e),
-            }
-        }
-        Err(error.unwrap())
-
-         */
-        Ok("".to_string())
     }
 }
