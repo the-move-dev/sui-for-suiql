@@ -1,18 +1,21 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use async_trait::async_trait;
+use std::io::Write;
+use std::sync::Arc;
 use std::{
-    io::{Read, Write},
     net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
 
 use futures::future::try_join_all;
-use ssh2::{Channel, Session};
-use tokio::runtime::Handle;
+use russh::client::Msg;
+use russh::{client, Channel};
+use russh_keys::{key};
 use tokio::task::JoinHandle;
-use tokio::{net::TcpStream, time::sleep};
+use tokio::time::sleep;
 
 use crate::{
     client::Instance,
@@ -173,7 +176,7 @@ impl SshConnectionManager {
         I: IntoIterator<Item = (Instance, S)>,
         S: Into<String> + Send + 'static,
     {
-        let handles = self.run_per_instance(instances, context);
+        let handles = self.run_per_instance(instances, context).await;
 
         try_join_all(handles)
             .await
@@ -182,7 +185,7 @@ impl SshConnectionManager {
             .collect::<SshResult<_>>()
     }
 
-    fn run_per_instance<I, S>(
+    async fn run_per_instance<I, S>(
         &self,
         instances: I,
         context: CommandContext,
@@ -200,10 +203,7 @@ impl SshConnectionManager {
                 tokio::spawn(async move {
                     let connection = ssh_manager.connect(instance.ssh_address()).await?;
                     // SshConnection::execute is a blocking call, needs to go to blocking pool
-                    Handle::current()
-                        .spawn_blocking(move || connection.execute(context.apply(command)))
-                        .await
-                        .unwrap()
+                    connection.execute(context.apply(command)).await
                 })
             })
             .collect::<Vec<_>>()
@@ -270,10 +270,24 @@ impl SshConnectionManager {
     }
 }
 
+struct Client {}
+
+#[async_trait]
+impl client::Handler for Client {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        self,
+        _server_public_key: &key::PublicKey,
+    ) -> Result<(Self, bool), Self::Error> {
+        Ok((self, true))
+    }
+}
+
 /// Representation of an ssh connection.
 pub struct SshConnection {
     /// The ssh session.
-    session: Session,
+    session: client::Handle<Client>,
     /// The host address.
     address: SocketAddr,
     /// The number of retries before giving up to execute the command.
@@ -290,19 +304,22 @@ impl SshConnection {
         username: &str,
         private_key_file: P,
     ) -> SshResult<Self> {
-        let tcp = TcpStream::connect(address)
+        let key = russh_keys::load_secret_key(private_key_file, None)
+            .map_err(|error| SshError::PrivateKeyError { address, error })?;
+
+        let config = client::Config {
+            connection_timeout: Some(Self::DEFAULT_TIMEOUT),
+            ..<_>::default()
+        };
+
+        let sh = Client {};
+        let mut session = client::connect(Arc::new(config), address, sh)
             .await
             .map_err(|error| SshError::ConnectionError { address, error })?;
 
-        let mut session =
-            Session::new().map_err(|error| SshError::SessionError { address, error })?;
-        session.set_timeout(Self::DEFAULT_TIMEOUT.as_millis() as u32);
-        session.set_tcp_stream(tcp);
-        session
-            .handshake()
-            .map_err(|error| SshError::SessionError { address, error })?;
-        session
-            .userauth_pubkey_file(username, None, private_key_file.as_ref(), None)
+        let _auth_res = session
+            .authenticate_publickey(username, Arc::new(key))
+            .await
             .map_err(|error| SshError::SessionError { address, error })?;
 
         Ok(Self {
@@ -314,12 +331,15 @@ impl SshConnection {
 
     /// Set a timeout for the ssh connection. If no timeouts are specified, reset it to the
     /// default value.
-    pub fn with_timeout(self, timeout: &Option<Duration>) -> Self {
+    pub fn with_timeout(self, _timeout: &Option<Duration>) -> Self {
+        /*
         let duration = match timeout {
             Some(value) => value,
             None => &Self::DEFAULT_TIMEOUT,
         };
         self.session.set_timeout(duration.as_millis() as u32);
+
+         */
         self
     }
 
@@ -330,33 +350,34 @@ impl SshConnection {
     }
 
     /// Make a useful session error from the lower level error message.
-    fn make_session_error(&self, error: ssh2::Error) -> SshError {
+    fn make_session_error(&self, error: russh::Error) -> SshError {
         SshError::SessionError {
             address: self.address,
             error,
         }
     }
 
+    /*
     /// Make a useful connection error from the lower level error message.
     fn make_connection_error(&self, error: std::io::Error) -> SshError {
         SshError::ConnectionError {
             address: self.address,
             error,
         }
-    }
+    }*/
 
     /// Execute a ssh command on the remote machine.
-    pub fn execute(&self, command: String) -> SshResult<(String, String)> {
+    pub async fn execute(&self, command: String) -> SshResult<(String, String)> {
         let mut error = None;
         for _ in 0..self.retries + 1 {
-            let channel = match self.session.channel_session() {
+            let channel = match self.session.channel_open_session().await {
                 Ok(x) => x,
                 Err(e) => {
                     error = Some(self.make_session_error(e));
                     continue;
                 }
             };
-            match self.execute_impl(channel, command.clone()) {
+            match self.execute_impl(channel, command.clone()).await {
                 r @ Ok(..) => return r,
                 Err(e) => error = Some(e),
             }
@@ -365,43 +386,47 @@ impl SshConnection {
     }
 
     /// Execute an ssh command on the remote machine and return both stdout and stderr.
-    fn execute_impl(&self, mut channel: Channel, command: String) -> SshResult<(String, String)> {
+    async fn execute_impl(
+        &self,
+        mut channel: Channel<Msg>,
+        command: String,
+    ) -> SshResult<(String, String)> {
         channel
-            .exec(&command)
+            .exec(true, command)
+            .await
             .map_err(|e| self.make_session_error(e))?;
 
-        let mut stdout = String::new();
-        channel
-            .read_to_string(&mut stdout)
-            .map_err(|e| self.make_connection_error(e))?;
+        let mut output = Vec::new();
+        let mut exit_code = None;
 
-        let mut stderr = String::new();
-        channel
-            .stderr()
-            .read_to_string(&mut stderr)
-            .map_err(|e| self.make_connection_error(e))?;
+        while let Some(msg) = channel.wait().await {
+            match msg {
+                russh::ChannelMsg::Data { ref data } => output.write_all(data).unwrap(),
+                russh::ChannelMsg::ExitStatus { exit_status } => exit_code = Some(exit_status),
+                _ => {}
+            }
+        }
 
-        channel.close().map_err(|e| self.make_session_error(e))?;
         channel
-            .wait_close()
-            .map_err(|e| self.make_session_error(e))?;
+            .close()
+            .await
+            .map_err(|error| self.make_session_error(error))?;
 
-        let exit_status = channel
-            .exit_status()
-            .map_err(|e| self.make_session_error(e))?;
+        let output_str: String = String::from_utf8_lossy(&output).into();
 
         ensure!(
-            exit_status == 0,
+            exit_code.is_some() && exit_code.unwrap() == 0,
             SshError::NonZeroExitCode {
                 address: self.address,
-                code: exit_status,
-                message: stderr.clone()
+                code: exit_code.unwrap(),
+                message: output_str
             }
         );
 
-        Ok((stdout, stderr))
+        Ok((output_str.clone(), output_str))
     }
 
+    /*
     /// Upload a file to the remote machines through scp.
     #[allow(dead_code)]
     pub fn upload<P: AsRef<Path>>(&self, path: P, content: &[u8]) -> SshResult<()> {
@@ -426,8 +451,11 @@ impl SshConnection {
         Err(error.unwrap())
     }
 
+     */
+
     /// Download a file from the remote machines through scp.
-    pub fn download<P: AsRef<Path>>(&self, path: P) -> SshResult<String> {
+    pub fn download<P: AsRef<Path>>(&self, _path: P) -> SshResult<String> {
+        /*
         let mut error = None;
         for _ in 0..self.retries + 1 {
             let (mut channel, _stats) = match self.session.scp_recv(path.as_ref()) {
@@ -448,5 +476,8 @@ impl SshConnection {
             }
         }
         Err(error.unwrap())
+
+         */
+        Ok("".to_string())
     }
 }

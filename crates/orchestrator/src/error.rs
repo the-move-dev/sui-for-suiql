@@ -52,22 +52,28 @@ pub type SshResult<T> = Result<T, SshError>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum SshError {
+    #[error("Failed to load private key for {address}: {error}")]
+    PrivateKeyError {
+        address: SocketAddr,
+        error: russh_keys::Error,
+    },
+
     #[error("Failed to create ssh session with {address}: {error}")]
     SessionError {
         address: SocketAddr,
-        error: ssh2::Error,
+        error: russh::Error,
     },
 
     #[error("Failed to connect to instance {address}: {error}")]
     ConnectionError {
         address: SocketAddr,
-        error: std::io::Error,
+        error: russh::Error,
     },
 
     #[error("Remote execution on {address} returned exit code ({code}): {message}")]
     NonZeroExitCode {
         address: SocketAddr,
-        code: i32,
+        code: u32,
         message: String,
     },
 }
