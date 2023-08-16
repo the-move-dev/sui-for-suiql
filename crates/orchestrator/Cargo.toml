@@ -20,11 +20,11 @@ eyre = "0.6.8"
 futures = "0.3.28"
 prettytable-rs = "0.10.0"
 rand = "0.8.5"
-reqwest = "0.11.18"
 serde_json = "1.0.103"
 thiserror = "1.0.43"
 russh = "0.37.1"
 russh-keys = "0.37.1"
+reqwest.workspace = true
 
 prometheus-parse = { git = "https://github.com/asonnino/prometheus-parser.git", rev = "75334db" }
 
