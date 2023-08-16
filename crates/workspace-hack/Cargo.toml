@@ -206,7 +206,6 @@ crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
 crossbeam-epoch = { version = "0.9", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8" }
-crossterm-2f80eeee3b1b6c7e = { package = "crossterm", version = "0.26" }
 crossterm-2ffb4c3fe830441c = { package = "crossterm", version = "0.25" }
 crossterm-3c51e837cfc5589a = { package = "crossterm", version = "0.22" }
 crossterm-647d43efb71741da = { package = "crossterm", version = "0.21" }
@@ -981,7 +980,6 @@ crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
 crossbeam-epoch = { version = "0.9", default-features = false, features = ["std"] }
 crossbeam-utils = { version = "0.8" }
-crossterm-2f80eeee3b1b6c7e = { package = "crossterm", version = "0.26" }
 crossterm-2ffb4c3fe830441c = { package = "crossterm", version = "0.25" }
 crossterm-3c51e837cfc5589a = { package = "crossterm", version = "0.22" }
 crossterm-647d43efb71741da = { package = "crossterm", version = "0.21" }

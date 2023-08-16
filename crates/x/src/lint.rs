@@ -72,6 +72,7 @@ pub fn run(args: Args) -> crate::Result<()> {
             "clap".to_owned(),
             "serde_yaml".to_owned(),
             "syn".to_owned(),
+            "aws-config".to_owned(),
         ],
     };
 
