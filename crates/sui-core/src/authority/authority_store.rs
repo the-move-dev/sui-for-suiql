@@ -1207,7 +1207,6 @@ impl AuthorityStore {
     }
 
     /// Acquires a lock for a transaction on the given objects if they have all been initialized previously
-    /// to None state.  4
     pub(crate) async fn acquire_transaction_locks(
         &self,
         epoch: EpochId,

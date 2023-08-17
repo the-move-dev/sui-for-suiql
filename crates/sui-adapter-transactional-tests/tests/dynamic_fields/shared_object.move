@@ -1,6 +1,8 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+// tests adding a shared object as a dynamic field
+
 //# init --addresses test=0x0 --accounts A
 
 //# publish
@@ -76,6 +78,7 @@ module test::m {
 
 //# run test::m::child --sender A
 
+// This aborts because shared objects cannot be added as dynamic fields
 //# run test::m::add_field --sender A --args object(2,0) object(3,0)
 
 //# view-object 3,0
