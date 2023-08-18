@@ -1230,15 +1230,11 @@ impl AuthorityState {
                 error: "dry-exec is only supported on fullnodes".to_string(),
             });
         }
-        match transaction.kind() {
-            TransactionKind::ProgrammableTransaction(_) => (),
-            TransactionKind::ChangeEpoch(_)
-            | TransactionKind::Genesis(_)
-            | TransactionKind::ConsensusCommitPrologue(_) => {
-                return Err(SuiError::UnsupportedFeatureError {
-                    error: "dry-exec does not support system transactions".to_string(),
-                });
-            }
+
+        if transaction.kind().is_system_tx() {
+            return Err(SuiError::UnsupportedFeatureError {
+                error: "dry-exec does not support system transactions".to_string(),
+            });
         }
 
         // make a gas object if one was not provided

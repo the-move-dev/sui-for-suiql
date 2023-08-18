@@ -14,7 +14,7 @@ use crate::message_envelope::{
     AuthenticatedMessage, Envelope, Message, TrustedEnvelope, VerifiedEnvelope,
 };
 use crate::messages_checkpoint::CheckpointTimestamp;
-use crate::messages_consensus::ConsensusCommitPrologue;
+use crate::messages_consensus::{AuthenticatorStateUpdate, ConsensusCommitPrologue};
 use crate::object::{MoveObject, Object, Owner};
 use crate::programmable_transaction_builder::ProgrammableTransactionBuilder;
 use crate::signature::{AuthenticatorTrait, GenericSignature, VerifyParams};
@@ -204,17 +204,23 @@ pub enum TransactionKind {
 }
 
 impl VersionedProtocolMessage for TransactionKind {
-    fn check_version_supported(&self, _protocol_config: &ProtocolConfig) -> SuiResult {
-        // This code does nothing right now - it exists to cause a compiler error when new
-        // enumerants are added to TransactionKind.
-        //
-        // When we add new cases here, check that current_protocol_version does not pre-date the
-        // addition of that enumerant.
+    fn check_version_supported(&self, protocol_config: &ProtocolConfig) -> SuiResult {
+        // When adding new cases, they must be guarded by a feature flag and return
+        // UnsupportedFeatureError if the flag is not set.
         match &self {
             TransactionKind::ChangeEpoch(_)
             | TransactionKind::Genesis(_)
             | TransactionKind::ConsensusCommitPrologue(_)
             | TransactionKind::ProgrammableTransaction(_) => Ok(()),
+            TransactionKind::AuthenticatorStateUpdate(_) => {
+                if protocol_config.enable_jwk_consensus_updates() {
+                    Ok(())
+                } else {
+                    Err(SuiError::UnsupportedFeatureError {
+                        error: "authenticator state updates not enabled".to_string(),
+                    })
+                }
+            }
         }
     }
 }
@@ -821,6 +827,7 @@ impl TransactionKind {
             TransactionKind::ChangeEpoch(_)
                 | TransactionKind::Genesis(_)
                 | TransactionKind::ConsensusCommitPrologue(_)
+                | TransactionKind::AuthenticatorStateUpdate(_)
         )
     }
 
@@ -892,6 +899,9 @@ impl TransactionKind {
                     mutable: true,
                 }]
             }
+            Self::AuthenticatorStateUpdate(_) => {
+                todo!()
+            }
             Self::ProgrammableTransaction(p) => return p.input_objects(),
         };
         // Ensure that there are no duplicate inputs. This cannot be removed because:
@@ -914,6 +924,10 @@ impl TransactionKind {
             TransactionKind::ChangeEpoch(_)
             | TransactionKind::Genesis(_)
             | TransactionKind::ConsensusCommitPrologue(_) => (),
+            TransactionKind::AuthenticatorStateUpdate(_) => {
+                // The transaction should have been rejected earlier if the feature is not enabled.
+                assert!(config.enable_jwk_consensus_updates());
+            }
         };
         Ok(())
     }
@@ -939,6 +953,7 @@ impl TransactionKind {
             Self::Genesis(_) => "Genesis",
             Self::ConsensusCommitPrologue(_) => "ConsensusCommitPrologue",
             Self::ProgrammableTransaction(_) => "ProgrammableTransaction",
+            Self::AuthenticatorStateUpdate(_) => "AuthenticatorStateUpdate",
         }
     }
 }
@@ -965,6 +980,9 @@ impl Display for TransactionKind {
             Self::ProgrammableTransaction(p) => {
                 writeln!(writer, "Transaction Kind : Programmable")?;
                 write!(writer, "{p}")?;
+            }
+            Self::AuthenticatorStateUpdate(_) => {
+                writeln!(writer, "Transaction Kind : Authenticator State Update")?;
             }
         }
         write!(f, "{}", writer)
@@ -1580,7 +1598,8 @@ impl TransactionDataAPI for TransactionDataV1 {
             TransactionKind::ProgrammableTransaction(_) => true,
             TransactionKind::ChangeEpoch(_)
             | TransactionKind::ConsensusCommitPrologue(_)
-            | TransactionKind::Genesis(_) => false,
+            | TransactionKind::Genesis(_)
+            | TransactionKind::AuthenticatorStateUpdate(_) => false,
         };
         if allow_sponsored_tx {
             return Ok(());

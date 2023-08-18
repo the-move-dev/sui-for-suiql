@@ -7,6 +7,7 @@ use crate::messages_checkpoint::{
 };
 use crate::transaction::CertifiedTransaction;
 use byteorder::{BigEndian, ReadBytesExt};
+use fastcrypto_zkp::bn254::zk_login::JWK;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::fmt::{Debug, Formatter};
@@ -26,21 +27,9 @@ pub struct ConsensusCommitPrologue {
     pub commit_timestamp_ms: CheckpointTimestamp,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum AuthenticatorStateUpdate {
-    AddOAuthProviderContentV1(OAuthProviderContent),
-}
-
-/// Struct that contains all the OAuth provider information. A list of them can
-/// be retrieved from the JWK endpoint (e.g. <https://www.googleapis.com/oauth2/v3/certs>)
-/// and published on the bulletin along with a trusted party's signature.
-#[derive(Debug, Clone, PartialEq, Eq, JsonSchema, Hash, Serialize, Deserialize)]
-pub struct OAuthProviderContent {
-    kty: String,
-    kid: String,
-    pub e: String,
-    pub n: String,
-    alg: String,
+    AddOAuthProviderContentV1(JWK),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -220,4 +209,22 @@ impl ConsensusTransaction {
     pub fn is_end_of_publish(&self) -> bool {
         matches!(self.kind, ConsensusTransactionKind::EndOfPublish(_))
     }
+}
+
+#[test]
+fn test_jwk_compatibility() {
+    // Ensure that the JWK struct in fastcrypto does not change its format.
+    // If this test breaks DO NOT JUST UPDATE THE EXPECTED BYTES. Instead, add a local JWK struct
+    // that mirrors the fastcrypto struct, use it in AuthenticatorStateUpdate, and add Into/From
+    // as necessary.
+    let jwk = JWK {
+        kty: "a".to_string(),
+        e: "b".to_string(),
+        n: "c".to_string(),
+        alg: "d".to_string(),
+    };
+
+    let expected_bytes = vec![1, 97, 1, 98, 1, 99, 1, 100];
+    let jwk_bcs = bcs::to_bytes(&jwk).unwrap();
+    assert_eq!(jwk_bcs, expected_bytes);
 }

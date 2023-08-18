@@ -503,6 +503,9 @@ mod checked {
                     pt,
                 )
             }
+            TransactionKind::AuthenticatorStateUpdate(_) => {
+                todo!()
+            }
         }
     }
 
