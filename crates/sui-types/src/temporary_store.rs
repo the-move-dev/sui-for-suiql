@@ -42,7 +42,7 @@ use sui_protocol_config::ProtocolConfig;
 pub type WrittenObjects = BTreeMap<ObjectID, (ObjectRef, Object, WriteKind)>;
 pub type ObjectMap = BTreeMap<ObjectID, Object>;
 pub type TxCoins = (ObjectMap, WrittenObjects);
-pub type DeletedSharedObjects = BTreeMap<ObjectID, SequenceNumber>;
+pub type DeletedSharedObjects = BTreeMap<ObjectID, TransactionDigest>;
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

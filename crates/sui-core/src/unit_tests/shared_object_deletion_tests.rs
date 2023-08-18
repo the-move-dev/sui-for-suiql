@@ -28,6 +28,7 @@ use crate::{
 };
 use move_core_types::ident_str;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+use sui_types::base_types::TransactionDigest;
 use sui_types::committee::EpochId;
 use sui_types::effects::TransactionEffectsV1;
 use sui_types::error::{ExecutionError, SuiError, UserInputError};
@@ -277,7 +278,11 @@ impl TestRunner {
         execute_sequenced_certificate_to_effects(&self.authority_state, certificate).await
     }
 
-    pub fn object_exists_in_marker_table(&mut self, object_id: &ObjectID, epoch: EpochId) -> bool {
+    pub fn object_exists_in_marker_table(
+        &mut self,
+        object_id: &ObjectID,
+        epoch: EpochId,
+    ) -> Option<TransactionDigest> {
         self.authority_state
             .database
             .shared_object_deleted(object_id, epoch)
@@ -331,7 +336,19 @@ async fn test_delete_shared_object() {
     assert!(effects.unwrapped_then_deleted.is_empty());
     assert!(effects.wrapped.is_empty());
 
-    assert!(user1.object_exists_in_marker_table(&deleted_obj_id, 0));
+    assert_eq!(
+        user1
+            .object_exists_in_marker_table(&deleted_obj_id, 0)
+            .unwrap(),
+        effects.transaction_digest,
+    );
+
+    assert_eq!(
+        user1
+            .object_exists_in_marker_table(&deleted_obj_id, 0)
+            .unwrap(),
+        effects.transaction_digest,
+    );
 }
 
 #[tokio::test]
@@ -363,10 +380,12 @@ async fn test_mutate_after_delete() {
         .await
         .unwrap();
 
-    let (TransactionEffects::V1(_effects), _error) = user_1
+    let (TransactionEffects::V1(orig_effects), _error) = user_1
         .execute_sequenced_certificate_to_effects(delete_cert)
         .await
         .unwrap();
+
+    let digest = orig_effects.transaction_digest;
 
     let (TransactionEffects::V1(effects), error) = user_1
         .execute_sequenced_certificate_to_effects(mutate_cert)
@@ -383,6 +402,15 @@ async fn test_mutate_after_delete() {
 
     // The gas coin gets mutated
     assert_eq!(effects.mutated.len(), 1);
+
+    let mut found_digest_in_dependencies = false;
+    for dependency in effects.dependencies {
+        if dependency == digest {
+            found_digest_in_dependencies = true;
+        }
+    }
+
+    assert!(found_digest_in_dependencies);
 }
 
 #[tokio::test]

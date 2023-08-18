@@ -258,6 +258,7 @@ mod checked {
             gas_charger,
             *epoch_id,
         );
+
         (inner, effects, execution_result)
     }
 

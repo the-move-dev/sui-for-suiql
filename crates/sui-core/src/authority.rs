@@ -1179,7 +1179,7 @@ impl AuthorityState {
         let tx_digest = *certificate.digest();
         let protocol_config = epoch_store.protocol_config();
         let shared_object_refs = input_objects.filter_shared_objects();
-        let transaction_dependencies = input_objects.transaction_dependencies();
+        let mut transaction_dependencies = input_objects.transaction_dependencies();
         let temporary_store = TemporaryStore::new(
             self.database.clone(),
             input_objects,
@@ -1215,6 +1215,11 @@ impl AuthorityState {
                 transaction_dependencies,
             )
         } else {
+            // insert transaction digests that deleted a shared object that this transaction had
+            // as input but no longer exists due to sequencing order into transaction dependencies
+            for (_, digest) in deleted_shared_objects {
+                transaction_dependencies.insert(digest);
+            }
             epoch_store.executor().commit_transaction_without_execution(
                 shared_object_refs,
                 temporary_store,

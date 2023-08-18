@@ -407,17 +407,15 @@ impl AuthorityStore {
         &self,
         object_id: &ObjectID,
         epoch_id: EpochId,
-    ) -> Result<bool, SuiError> {
+    ) -> Result<Option<TransactionDigest>, TypedStoreError> {
         let object_key = (
             epoch_id,
             ObjectKey(*object_id, SHARED_OBJECT_MARKER_VERSION),
             SharedObjectDeleted,
         );
-        Ok(self
-            .perpetual_tables
+        self.perpetual_tables
             .object_per_epoch_marker_table
-            .get(&object_key)?
-            .is_some())
+            .get(&object_key)
     }
 
     /// Returns future containing the state hash for the given epoch
@@ -667,7 +665,7 @@ impl AuthorityStore {
                 None => {
                     let shared_object_deleted =
                         self.shared_object_deleted(&input_key.0, epoch_id)?;
-                    versioned_results.push((*idx, shared_object_deleted));
+                    versioned_results.push((*idx, shared_object_deleted.is_some()));
                 }
             }
         }
@@ -752,8 +750,8 @@ impl AuthorityStore {
                         Some(obj) => result.push((*kind, obj)),
                         None => {
                             // If the object was deleted by a concurrently certified tx then return this separately
-                            if self.shared_object_deleted(id, epoch_store.committee().epoch)? {
-                                deleted_shared_objects.insert(*id, *version);
+                            if let Some(digest) = self.shared_object_deleted(id, epoch_store.committee().epoch)? {
+                                deleted_shared_objects.insert(*id, digest);
                             } else {
                                 panic!("All dependencies of tx {:?} should have been executed now, but Shared Object id: {}, version: {} is absent", digest, *id, *version);
                             }
@@ -1071,7 +1069,7 @@ impl AuthorityStore {
         &self,
         write_batch: &mut DBBatch,
         inner_temporary_store: InnerTemporaryStore,
-        _transaction: &VerifiedTransaction,
+        transaction: &VerifiedTransaction,
         epoch_id: EpochId,
     ) -> SuiResult {
         let InnerTemporaryStore {
@@ -1112,7 +1110,7 @@ impl AuthorityStore {
                             ObjectKey(*object_id, SHARED_OBJECT_MARKER_VERSION),
                             SharedObjectDeleted,
                         ),
-                        (),
+                        transaction.digest(),
                     )
                 }),
         )?;
