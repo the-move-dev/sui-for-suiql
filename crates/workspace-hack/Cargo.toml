@@ -265,7 +265,6 @@ encode_unicode-dff4ba8e3ae991db = { package = "encode_unicode", version = "1" }
 encoding_rs = { version = "0.8" }
 endian-type = { version = "0.1", default-features = false }
 enum-compat-util = { path = "../../external-crates/move/testing-infra/enum-compat-util", default-features = false }
-equivalent = { version = "1", default-features = false }
 ethnum = { version = "1", default-features = false }
 event-listener = { version = "2", default-features = false }
 expect-test = { version = "1", default-features = false }
@@ -320,7 +319,6 @@ h2 = { version = "0.3", default-features = false }
 hakari = { version = "0.13", default-features = false, features = ["cli-support"] }
 half = { version = "1", default-features = false }
 handlebars = { version = "4" }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", default-features = false, features = ["raw"] }
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13", features = ["raw"] }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
@@ -351,8 +349,7 @@ impl-codec = { version = "0.5", default-features = false, features = ["std"] }
 impl-serde = { version = "0.3", default-features = false }
 include_dir = { version = "0.7", features = ["glob"] }
 indenter = { version = "0.3" }
-indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
-indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2" }
+indexmap = { version = "1", default-features = false, features = ["serde", "std"] }
 indicatif = { version = "0.17" }
 inout = { version = "0.1", default-features = false, features = ["std"] }
 inquire = { version = "0.6" }
@@ -1060,7 +1057,6 @@ encoding_rs = { version = "0.8" }
 endian-type = { version = "0.1", default-features = false }
 enum-compat-util = { path = "../../external-crates/move/testing-infra/enum-compat-util", default-features = false }
 enum_dispatch = { version = "0.3", default-features = false }
-equivalent = { version = "1", default-features = false }
 ethnum = { version = "1", default-features = false }
 event-listener = { version = "2", default-features = false }
 expect-test = { version = "1", default-features = false }
@@ -1118,7 +1114,6 @@ h2 = { version = "0.3", default-features = false }
 hakari = { version = "0.13", default-features = false, features = ["cli-support"] }
 half = { version = "1", default-features = false }
 handlebars = { version = "4" }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", default-features = false, features = ["raw"] }
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13", features = ["raw"] }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
@@ -1156,8 +1151,7 @@ impl-trait-for-tuples = { version = "0.2", default-features = false }
 include_dir = { version = "0.7", features = ["glob"] }
 include_dir_macros = { version = "0.7", default-features = false }
 indenter = { version = "0.3" }
-indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
-indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2" }
+indexmap = { version = "1", default-features = false, features = ["serde", "std"] }
 indicatif = { version = "0.17" }
 inout = { version = "0.1", default-features = false, features = ["std"] }
 inquire = { version = "0.6" }
