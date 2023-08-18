@@ -305,6 +305,26 @@ pub async fn certify_shared_obj_transaction_no_execution(
     Ok(certificate)
 }
 
+pub async fn enqueue_all_and_execute_all(
+    authority: &AuthorityState,
+    certificates: Vec<VerifiedCertificate>,
+) -> Result<Vec<(TransactionEffects, Option<ExecutionError>)>, SuiError> {
+    authority
+        .enqueue_certificates_for_execution(
+            certificates.clone(),
+            &authority.epoch_store_for_testing(),
+        )
+        .unwrap();
+
+    let mut output = Vec::new();
+    for cert in certificates {
+        let (result, execution_error_opt) = authority.try_execute_for_test(&cert).await?;
+        let effects = result.inner().data().clone();
+        output.push((effects, execution_error_opt));
+    }
+    Ok(output)
+}
+
 pub async fn execute_sequenced_certificate_to_effects(
     authority: &AuthorityState,
     certificate: VerifiedCertificate,

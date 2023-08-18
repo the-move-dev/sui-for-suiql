@@ -14,10 +14,12 @@ use sui_types::{
 };
 
 use crate::authority::authority_test_utils::execute_sequenced_certificate_to_effects;
-use crate::authority::authority_tests::certify_shared_obj_transaction_no_execution;
 use crate::{
     authority::{
-        authority_tests::{build_programmable_transaction, execute_programmable_transaction},
+        authority_tests::{
+            build_programmable_transaction, certify_shared_obj_transaction_no_execution,
+            enqueue_all_and_execute_all, execute_programmable_transaction,
+        },
         move_integration_tests::build_and_publish_test_package,
         test_authority_builder::TestAuthorityBuilder,
         AuthorityState,
@@ -261,6 +263,13 @@ impl TestRunner {
         certify_shared_obj_transaction_no_execution(&self.authority_state, tx).await
     }
 
+    pub async fn enqueue_all_and_execute_all(
+        &mut self,
+        certificates: Vec<VerifiedCertificate>,
+    ) -> Result<Vec<(TransactionEffects, Option<ExecutionError>)>, SuiError> {
+        enqueue_all_and_execute_all(&self.authority_state, certificates).await
+    }
+
     pub async fn execute_sequenced_certificate_to_effects(
         &mut self,
         certificate: VerifiedCertificate,
@@ -365,6 +374,76 @@ async fn test_mutate_after_delete() {
         .unwrap();
 
     assert!(matches!(error.unwrap().kind(), CertificateDenied));
+    assert!(effects.status.is_err());
+    assert_eq!(effects.deleted.len(), 0);
+
+    assert!(effects.created.is_empty());
+    assert!(effects.unwrapped_then_deleted.is_empty());
+    assert!(effects.wrapped.is_empty());
+
+    // The gas coin gets mutated
+    assert_eq!(effects.mutated.len(), 1);
+}
+
+#[tokio::test]
+async fn test_mutate_after_delete_enqueued() {
+    let mut user_1 = TestRunner::new("shared_object_deletion").await;
+    let effects = user_1.create_shared_object().await;
+
+    assert_eq!(effects.created.len(), 1);
+
+    let shared_obj = effects.created[0].0;
+    let shared_obj_id = shared_obj.0;
+    let initial_shared_version = shared_obj.1;
+
+    let mutate_obj_tx = user_1
+        .mutate_shared_obj_tx(shared_obj_id, initial_shared_version)
+        .await;
+
+    let mutate_obj_tx_2 = user_1
+        .mutate_shared_obj_tx(shared_obj_id, initial_shared_version)
+        .await;
+
+    let delete_obj_tx = user_1
+        .delete_shared_obj_tx(shared_obj_id, initial_shared_version)
+        .await;
+
+    let delete_cert = user_1
+        .certify_shared_obj_transaction(delete_obj_tx)
+        .await
+        .unwrap();
+
+    let mutate_cert = user_1
+        .certify_shared_obj_transaction(mutate_obj_tx)
+        .await
+        .unwrap();
+
+    let mutate_cert_2 = user_1
+        .certify_shared_obj_transaction(mutate_obj_tx_2)
+        .await
+        .unwrap();
+
+    let res = user_1
+        .enqueue_all_and_execute_all(vec![delete_cert, mutate_cert, mutate_cert_2])
+        .await
+        .unwrap();
+
+    let (TransactionEffects::V1(effects), error) = res.get(1).unwrap();
+
+    assert!(matches!(error.as_ref().unwrap().kind(), CertificateDenied));
+    assert!(effects.status.is_err());
+    assert_eq!(effects.deleted.len(), 0);
+
+    assert!(effects.created.is_empty());
+    assert!(effects.unwrapped_then_deleted.is_empty());
+    assert!(effects.wrapped.is_empty());
+
+    // The gas coin gets mutated
+    assert_eq!(effects.mutated.len(), 1);
+
+    let (TransactionEffects::V1(effects), error) = res.get(2).unwrap();
+
+    assert!(matches!(error.as_ref().unwrap().kind(), CertificateDenied));
     assert!(effects.status.is_err());
     assert_eq!(effects.deleted.len(), 0);
 
