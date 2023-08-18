@@ -147,7 +147,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "bytes",
- "ed25519",
+ "ed25519 1.5.3",
  "futures",
  "hex",
  "http",
@@ -1723,7 +1723,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3806a8db60cf56efee531616a34a6aaa9a114d6da2add861b0fa4a188881b2c7"
 dependencies = [
  "blowfish",
- "pbkdf2",
+ "pbkdf2 0.11.0",
+ "sha2 0.10.6",
+]
+
+[[package]]
+name = "bcrypt-pbkdf"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aeac2e1fe888769f34f05ac343bbef98b14d1ffb292ab69d4608b3abc86f2a2"
+dependencies = [
+ "blowfish",
+ "pbkdf2 0.12.1",
  "sha2 0.10.6",
 ]
 
@@ -1812,7 +1823,7 @@ dependencies = [
  "hmac 0.12.1",
  "k256",
  "once_cell",
- "pbkdf2",
+ "pbkdf2 0.11.0",
  "rand_core 0.6.4",
  "ripemd",
  "sha2 0.10.6",
@@ -2656,9 +2667,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28d997bd5e24a5928dd43e46dc529867e207907fe0b239c3477d924f7f2ca320"
+checksum = "280a9f2d8b3a38871a3c8a46fb80db65e5e5ed97da80c4d08bf27fb63e35e181"
 dependencies = [
  "libc",
 ]
@@ -2930,6 +2941,34 @@ dependencies = [
  "rand_core 0.5.1",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f711ade317dd348950a9910f81c5947e3d8907ebd2b83f76203ff1807e6a2bc2"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "curve25519-dalek-derive",
+ "digest 0.10.6",
+ "fiat-crypto",
+ "platforms",
+ "rustc_version",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83fdaf97f4804dcebfa5862639bc9ce4121e82140bec2a987ac5140294865b5b"
+dependencies = [
+ "proc-macro2 1.0.66",
+ "quote 1.0.32",
+ "syn 2.0.28",
 ]
 
 [[package]]
@@ -3363,7 +3402,16 @@ version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.3.7",
+]
+
+[[package]]
+name = "dirs"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
+dependencies = [
+ "dirs-sys 0.4.1",
 ]
 
 [[package]]
@@ -3385,6 +3433,18 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -3491,6 +3551,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ed25519"
+version = "2.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60f6d271ca33075c88028be6f04d502853d63a5ece419d269c15315d4fc1cf1d"
+dependencies = [
+ "pkcs8 0.10.2",
+ "signature 2.0.0",
+]
+
+[[package]]
 name = "ed25519-consensus"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3511,11 +3581,25 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
- "curve25519-dalek",
- "ed25519",
+ "curve25519-dalek 3.2.0",
+ "ed25519 1.5.3",
  "rand 0.7.3",
  "serde",
  "sha2 0.9.9",
+ "zeroize",
+]
+
+[[package]]
+name = "ed25519-dalek"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7277392b266383ef8396db7fdeb1e77b6c52fed775f5df15bb24f35b72156980"
+dependencies = [
+ "curve25519-dalek 4.0.0",
+ "ed25519 2.2.2",
+ "rand_core 0.6.4",
+ "serde",
+ "sha2 0.10.6",
  "zeroize",
 ]
 
@@ -3526,7 +3610,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97c6ac152eba578c1c53d2cefe8ad02e239e3d6f971b0f1ef3cb54cd66037fa0"
 dependencies = [
  "curve25519-dalek-fiat",
- "ed25519",
+ "ed25519 1.5.3",
  "rand 0.8.5",
  "serde",
  "serde_bytes",
@@ -3897,9 +3981,9 @@ dependencies = [
 
 [[package]]
 name = "fiat-crypto"
-version = "0.1.17"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a214f5bb88731d436478f3ae1f8a277b62124089ba9fb67f4f93fb100ef73c90"
+checksum = "93ace6ec7cc19c8ed33a32eaa9ea692d7faea05006b5356b9e2b668ec4bc3955"
 
 [[package]]
 name = "findshlibs"
@@ -4471,6 +4555,12 @@ name = "hex-literal"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
+
+[[package]]
+name = "hex-literal"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
 
 [[package]]
 name = "hkdf"
@@ -6546,7 +6636,7 @@ dependencies = [
  "bincode",
  "criterion",
  "fastcrypto",
- "hex-literal",
+ "hex-literal 0.3.4",
  "proptest",
  "proptest-derive",
  "serde",
@@ -7248,6 +7338,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
+name = "option-ext"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
 name = "orchestrator"
 version = "0.0.1"
 dependencies = [
@@ -7264,8 +7360,8 @@ dependencies = [
  "prometheus-parse",
  "rand 0.8.5",
  "reqwest",
- "russh",
- "russh-keys",
+ "russh 0.38.0-beta.1",
+ "russh-keys 0.37.1 (git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6)",
  "serde",
  "serde_json",
  "sui-config",
@@ -7508,6 +7604,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbkdf2"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0ca0b5a68607598bf3bad68f32227a8164f6254833f84eafaac409cd6746c31"
+dependencies = [
+ "digest 0.10.6",
+]
+
+[[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7732,6 +7837,12 @@ name = "pkg-config"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ac9a59f73473f1b8d852421e59e64809f025994837ef743615c6d0c5b305160"
+
+[[package]]
+name = "platforms"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3d7ddaed09e0eb771a79ab0fd64609ba0afb0a8366421957936ad14cbd13630"
 
 [[package]]
 name = "plotters"
@@ -8818,20 +8929,54 @@ dependencies = [
  "byteorder",
  "chacha20",
  "ctr",
- "curve25519-dalek",
+ "curve25519-dalek 3.2.0",
  "digest 0.10.6",
  "flate2",
  "futures",
  "generic-array",
- "hex-literal",
+ "hex-literal 0.3.4",
  "hmac 0.12.1",
  "log",
  "num-bigint",
  "once_cell",
  "poly1305",
  "rand 0.8.5",
- "russh-cryptovec",
- "russh-keys",
+ "russh-cryptovec 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "russh-keys 0.37.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sha1",
+ "sha2 0.10.6",
+ "subtle",
+ "thiserror",
+ "tokio",
+ "tokio-util 0.7.4",
+]
+
+[[package]]
+name = "russh"
+version = "0.38.0-beta.1"
+source = "git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6#44fff3740b5831b3c03d2b23de95f43e2ba69ca6"
+dependencies = [
+ "aes",
+ "aes-gcm",
+ "async-trait",
+ "bitflags 2.3.3",
+ "byteorder",
+ "chacha20",
+ "ctr",
+ "curve25519-dalek 4.0.0",
+ "digest 0.10.6",
+ "flate2",
+ "futures",
+ "generic-array",
+ "hex-literal 0.4.1",
+ "hmac 0.12.1",
+ "log",
+ "num-bigint",
+ "once_cell",
+ "poly1305",
+ "rand 0.8.5",
+ "russh-cryptovec 0.7.0 (git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6)",
+ "russh-keys 0.37.1 (git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6)",
  "sha1",
  "sha2 0.10.6",
  "subtle",
@@ -8851,21 +8996,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "russh-cryptovec"
+version = "0.7.0"
+source = "git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6#44fff3740b5831b3c03d2b23de95f43e2ba69ca6"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "russh-keys"
 version = "0.37.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2efecb132e085e1e7a3afdae40e19eec0dfd4d6159eb189de02f243c369e18b7"
 dependencies = [
  "aes",
- "bcrypt-pbkdf",
+ "bcrypt-pbkdf 0.9.0",
  "bit-vec",
  "block-padding 0.3.2",
  "byteorder",
  "cbc",
  "ctr",
  "data-encoding",
- "dirs",
- "ed25519-dalek",
+ "dirs 4.0.0",
+ "ed25519-dalek 1.0.1",
  "futures",
  "hmac 0.12.1",
  "inout",
@@ -8873,10 +9027,45 @@ dependencies = [
  "md5",
  "num-bigint",
  "num-integer",
- "pbkdf2",
+ "pbkdf2 0.11.0",
  "rand 0.7.3",
  "rand_core 0.5.1",
- "russh-cryptovec",
+ "russh-cryptovec 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde",
+ "sha2 0.10.6",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "yasna",
+]
+
+[[package]]
+name = "russh-keys"
+version = "0.37.1"
+source = "git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6#44fff3740b5831b3c03d2b23de95f43e2ba69ca6"
+dependencies = [
+ "aes",
+ "async-trait",
+ "bcrypt-pbkdf 0.10.0",
+ "bit-vec",
+ "block-padding 0.3.2",
+ "byteorder",
+ "cbc",
+ "ctr",
+ "data-encoding",
+ "dirs 5.0.1",
+ "ed25519-dalek 2.0.0",
+ "futures",
+ "hmac 0.12.1",
+ "inout",
+ "log",
+ "md5",
+ "num-bigint",
+ "num-integer",
+ "pbkdf2 0.11.0",
+ "rand 0.7.3",
+ "rand_core 0.6.4",
+ "russh-cryptovec 0.7.0 (git+https://github.com/warp-tech/russh.git?rev=44fff3740b5831b3c03d2b23de95f43e2ba69ca6)",
  "serde",
  "sha2 0.10.6",
  "thiserror",
@@ -9547,7 +9736,7 @@ version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da03fa3b94cc19e3ebfc88c4229c49d8f08cdbd1228870a45f0ffdf84988e14b"
 dependencies = [
- "dirs",
+ "dirs 4.0.0",
 ]
 
 [[package]]
@@ -10156,7 +10345,7 @@ dependencies = [
  "anyhow",
  "bcs",
  "csv",
- "dirs",
+ "dirs 4.0.0",
  "fastcrypto",
  "insta",
  "move-binary-format",
@@ -10491,7 +10680,7 @@ dependencies = [
  "bcs",
  "camino",
  "csv",
- "dirs",
+ "dirs 4.0.0",
  "fastcrypto",
  "insta",
  "move-binary-format",
@@ -11268,7 +11457,7 @@ dependencies = [
  "axum",
  "clap 3.2.23",
  "dashmap",
- "dirs",
+ "dirs 4.0.0",
  "eyre",
  "futures",
  "http",
@@ -11318,7 +11507,7 @@ dependencies = [
  "bcs",
  "clap 3.2.23",
  "colored",
- "dirs",
+ "dirs 4.0.0",
  "fastcrypto",
  "futures",
  "futures-core",
@@ -11576,7 +11765,7 @@ dependencies = [
  "bcs",
  "camino",
  "csv",
- "dirs",
+ "dirs 4.0.0",
  "fastcrypto",
  "insta",
  "move-binary-format",
@@ -11654,7 +11843,7 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-server",
- "ed25519",
+ "ed25519 1.5.3",
  "fastcrypto",
  "pkcs8 0.9.0",
  "rand 0.8.5",
@@ -12309,7 +12498,7 @@ dependencies = [
  "anyhow",
  "hmac 0.12.1",
  "once_cell",
- "pbkdf2",
+ "pbkdf2 0.11.0",
  "rand 0.8.5",
  "rustc-hash",
  "sha2 0.10.6",
@@ -13761,7 +13950,7 @@ dependencies = [
  "base64-simd",
  "base64-url",
  "base64ct",
- "bcrypt-pbkdf",
+ "bcrypt-pbkdf 0.9.0",
  "bcs",
  "beef",
  "better_any",
@@ -13875,7 +14064,7 @@ dependencies = [
  "csv-core",
  "ctor",
  "ctr",
- "curve25519-dalek",
+ "curve25519-dalek 3.2.0",
  "curve25519-dalek-fiat",
  "curve25519-dalek-ng",
  "darling",
@@ -13912,9 +14101,9 @@ dependencies = [
  "diffy",
  "digest 0.10.6",
  "digest 0.9.0",
- "dirs",
+ "dirs 4.0.0",
  "dirs-next",
- "dirs-sys",
+ "dirs-sys 0.3.7",
  "dirs-sys-next",
  "displaydoc",
  "dissimilar",
@@ -13924,9 +14113,9 @@ dependencies = [
  "dyn-clone",
  "ecdsa 0.14.8",
  "ecdsa 0.16.6",
- "ed25519",
+ "ed25519 1.5.3",
  "ed25519-consensus",
- "ed25519-dalek",
+ "ed25519-dalek 1.0.1",
  "ed25519-dalek-fiat",
  "either",
  "elliptic-curve 0.12.3",
@@ -14008,7 +14197,7 @@ dependencies = [
  "heck 0.3.3",
  "heck 0.4.1",
  "hex",
- "hex-literal",
+ "hex-literal 0.3.4",
  "hkdf",
  "hmac 0.11.0",
  "hmac 0.12.1",
@@ -14212,7 +14401,7 @@ dependencies = [
  "password-hash",
  "paste",
  "pathdiff",
- "pbkdf2",
+ "pbkdf2 0.11.0",
  "peeking_take_while",
  "pem",
  "pem-rfc7468 0.6.0",
@@ -14322,9 +14511,9 @@ dependencies = [
  "rusoto_credential",
  "rusoto_kms",
  "rusoto_signature",
- "russh",
- "russh-cryptovec",
- "russh-keys",
+ "russh 0.37.1",
+ "russh-cryptovec 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "russh-keys 0.37.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust_decimal",
  "rustc-demangle",
  "rustc-hash",

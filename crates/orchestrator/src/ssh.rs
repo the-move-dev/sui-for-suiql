@@ -304,21 +304,21 @@ pub struct SshConnection {
 
 impl SshConnection {
     /// Default duration before timing out the ssh connection.
-    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(300);
 
     /// Create a new ssh connection with a specific host.
     pub async fn new<P: AsRef<Path>>(
         address: SocketAddr,
         username: &str,
         private_key_file: P,
-        connection_timeout: Option<Duration>,
+        inactivity_timeout: Option<Duration>,
         retries: Option<usize>,
     ) -> SshResult<Self> {
         let key = russh_keys::load_secret_key(private_key_file, None)
             .map_err(|error| SshError::PrivateKeyError { address, error })?;
 
         let config = client::Config {
-            connection_timeout: connection_timeout.or(Some(Self::DEFAULT_TIMEOUT)),
+            inactivity_timeout: inactivity_timeout.or(Some(Self::DEFAULT_TIMEOUT)),
             ..<_>::default()
         };
 
