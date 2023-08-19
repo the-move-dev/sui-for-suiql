@@ -2171,6 +2171,13 @@ impl AuthorityPerEpochStore {
             .set(self.epoch_open_time.elapsed().as_millis() as i64);
     }
 
+    pub fn has_ouath_jwk(&self, jwk_id: &JwkId) -> bool {
+        self.tables
+            .oauth_provider_jwk
+            .contains_key(jwk_id)
+            .expect("read cannot fail")
+    }
+
     // TODO: should be pub(crate) when it is inserted only from consensus
     pub fn insert_oauth_jwk(&self, jwk_id: &JwkId, jwk: &JWK) {
         if self.signature_verifier.insert_oauth_jwk(jwk_id, jwk) {

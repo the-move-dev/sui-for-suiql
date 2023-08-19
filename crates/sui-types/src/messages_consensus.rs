@@ -128,6 +128,7 @@ pub enum ConsensusTransactionKind {
     CheckpointSignature(Box<CheckpointSignatureMessage>),
     EndOfPublish(AuthorityName),
     CapabilityNotification(AuthorityCapabilities),
+    NewJWKsFetched(Vec<(JwkId, JWK)>),
 }
 
 impl ConsensusTransaction {
