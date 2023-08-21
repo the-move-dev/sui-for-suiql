@@ -7,7 +7,7 @@ use crate::messages_checkpoint::{
 };
 use crate::transaction::CertifiedTransaction;
 use byteorder::{BigEndian, ReadBytesExt};
-use fastcrypto_zkp::bn254::zk_login::JWK;
+use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::fmt::{Debug, Formatter};
@@ -40,12 +40,13 @@ pub struct ConsensusTransaction {
     pub kind: ConsensusTransactionKind,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
 pub enum ConsensusTransactionKey {
     Certificate(TransactionDigest),
     CheckpointSignature(AuthorityName, CheckpointSequenceNumber),
     EndOfPublish(AuthorityName),
     CapabilityNotification(AuthorityName, u64 /* generation */),
+    NewJWKFetched(JwkId),
 }
 
 impl Debug for ConsensusTransactionKey {
@@ -62,6 +63,7 @@ impl Debug for ConsensusTransactionKey {
                 name.concise(),
                 generation
             ),
+            Self::NewJWKFetched(id) => write!(f, "NewJWKFetched({:?})", id),
         }
     }
 }
@@ -128,7 +130,7 @@ pub enum ConsensusTransactionKind {
     CheckpointSignature(Box<CheckpointSignatureMessage>),
     EndOfPublish(AuthorityName),
     CapabilityNotification(AuthorityCapabilities),
-    NewJWKsFetched(Vec<(JwkId, JWK)>),
+    NewJWKFetched(JwkId, JWK),
 }
 
 impl ConsensusTransaction {
@@ -177,6 +179,16 @@ impl ConsensusTransaction {
         }
     }
 
+    pub fn new_jwk_fetched(id: JwkId, jwk: JWK) -> Self {
+        let mut hasher = DefaultHasher::new();
+        id.hash(&mut hasher);
+        let tracking_id = hasher.finish().to_le_bytes();
+        Self {
+            tracking_id,
+            kind: ConsensusTransactionKind::NewJWKFetched(id, jwk),
+        }
+    }
+
     pub fn get_tracking_id(&self) -> u64 {
         (&self.tracking_id[..])
             .read_u64::<BigEndian>()
@@ -199,6 +211,9 @@ impl ConsensusTransaction {
             }
             ConsensusTransactionKind::CapabilityNotification(cap) => {
                 ConsensusTransactionKey::CapabilityNotification(cap.authority, cap.generation)
+            }
+            ConsensusTransactionKind::NewJWKFetched(id, _) => {
+                ConsensusTransactionKey::NewJWKFetched(id.clone())
             }
         }
     }

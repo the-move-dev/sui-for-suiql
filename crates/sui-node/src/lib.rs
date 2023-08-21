@@ -240,11 +240,18 @@ impl SuiNode {
                                     // inadvertently or otherwise
                                     if keys.len() > MAX_JWK_KEYS_PER_FETCH {
                                         warn!("Provider {:?} sent too many JWKs, only the first {} will be used", p, MAX_JWK_KEYS_PER_FETCH);
+                                        keys.truncate(MAX_JWK_KEYS_PER_FETCH);
                                     }
-                                    keys.truncate(MAX_JWK_KEYS_PER_FETCH);
 
-                                    for (jwk_id, jwk) in keys {
-                                        epoch_store.insert_oauth_jwk(&jwk_id, &jwk);
+                                    for (id, jwk) in keys.iter() {
+                                        info!("Submitting JWK to consensus: {:?}", id);
+
+
+                                        let txn = ConsensusTransactionKind::NewJWKFetched(id, jwk);
+                                        consensus_adapter.submit(txn, None, &epoch_store)
+                                            .await
+                                            .tap_err(|e| warn!("Error when submitting JWKs to consensus {:?}", e))
+                                            .ok();
                                     }
                                 }
                             }

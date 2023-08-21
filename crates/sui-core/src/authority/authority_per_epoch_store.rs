@@ -1552,6 +1552,10 @@ impl AuthorityPerEpochStore {
                     return Err(());
                 }
             }
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::NewJWKFetched(_, _),
+                ..
+            }) => {}
             SequencedConsensusTransactionKind::System(_) => {}
         }
         Ok(VerifiedSequencedConsensusTransaction(transaction))
@@ -1898,6 +1902,12 @@ impl AuthorityPerEpochStore {
                 }
                 self.record_consensus_transaction_processed(batch, transaction, consensus_index)?;
                 Ok(ConsensusCertificateResult::ConsensusMessage)
+            }
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::NewJWKFetched(_, _),
+                ..
+            }) => {
+                todo!()
             }
             SequencedConsensusTransactionKind::System(system_transaction) => {
                 if !self
