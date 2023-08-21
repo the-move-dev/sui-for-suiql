@@ -204,7 +204,7 @@ impl SuiNode {
 
     fn start_jwk_updater(
         epoch_store: Arc<AuthorityPerEpochStore>,
-        _consensus_adapter: Arc<ConsensusAdapter>,
+        consensus_adapter: Arc<ConsensusAdapter>,
     ) {
         let epoch = epoch_store.epoch();
         tokio::task::spawn(async move {
@@ -223,6 +223,7 @@ impl SuiNode {
             let mut join_set = tokio::task::JoinSet::new();
             for p in supported_providers.into_iter() {
                 let epoch_store = epoch_store.clone();
+                let consensus_adapter = consensus_adapter.clone();
                 join_set.spawn(
                     async move {
                         loop {
@@ -243,13 +244,11 @@ impl SuiNode {
                                         keys.truncate(MAX_JWK_KEYS_PER_FETCH);
                                     }
 
-                                    for (id, jwk) in keys.iter() {
+                                    for (id, jwk) in keys.into_iter() {
                                         info!("Submitting JWK to consensus: {:?}", id);
 
-
-                                        let txn = ConsensusTransactionKind::NewJWKFetched(id, jwk);
+                                        let txn = ConsensusTransaction::new_jwk_fetched(id, jwk);
                                         consensus_adapter.submit(txn, None, &epoch_store)
-                                            .await
                                             .tap_err(|e| warn!("Error when submitting JWKs to consensus {:?}", e))
                                             .ok();
                                     }
