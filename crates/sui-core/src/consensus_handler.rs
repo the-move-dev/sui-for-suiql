@@ -307,6 +307,8 @@ impl<T: ParentSync + Send + Sync> ExecutionState for ConsensusHandler<T> {
 
                 if verified_transaction.0.is_end_of_publish() {
                     end_of_publish_transactions.push(verified_transaction);
+                } else if verified_transaction.0.is_jwk_fetched() {
+                    new_jwks.push(verified_transaction);
                 } else {
                     sequenced_transactions.push(verified_transaction);
                 }

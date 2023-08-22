@@ -183,6 +183,9 @@ pub struct AuthorityPerEpochStore {
 
     /// Chain identifier
     chain_identifier: ChainIdentifier,
+
+    /// aggregator for JWK votes
+    jwk_aggregator: Arc<StakeAggregator<(JwkId, JWK), true>>,
 }
 
 /// AuthorityEpochTables contains tables that contain data that is only valid within an epoch.
@@ -309,6 +312,8 @@ pub struct AuthorityEpochTables {
     /// When transaction is executed via checkpoint executor, we store association here
     pub(crate) executed_transactions_to_checkpoint:
         DBMap<TransactionDigest, CheckpointSequenceNumber>,
+
+    pending_jwks: DBMap<(JwkId, AuthorityName), JWK>,
 
     /// Map from JwkId (iss, kid) to the fetched JWK for that key.
     oauth_provider_jwk: DBMap<JwkId, JWK>,
@@ -1215,6 +1220,11 @@ impl AuthorityPerEpochStore {
 
     pub fn get_capabilities(&self) -> Result<Vec<AuthorityCapabilities>, TypedStoreError> {
         self.tables.authority_capabilities.values().collect()
+    }
+
+    pub fn record_jwk(&self, sender: AuthorityName, id: &JwkId, jwk: &Jwk) -> SuiResult {
+        self.tables.jwks.insert(id, jwk)?;
+        Ok(())
     }
 
     /// Caller is responsible to call consensus_message_processed before this method

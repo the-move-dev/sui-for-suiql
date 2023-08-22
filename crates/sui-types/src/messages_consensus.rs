@@ -225,14 +225,18 @@ impl ConsensusTransaction {
     pub fn is_end_of_publish(&self) -> bool {
         matches!(self.kind, ConsensusTransactionKind::EndOfPublish(_))
     }
+
+    pub fn is_jwk_fetched(&self) -> bool {
+        matches!(self.kind, ConsensusTransactionKind::NewJWKFetched(_, _))
+    }
 }
 
 #[test]
 fn test_jwk_compatibility() {
-    // Ensure that the JWK struct in fastcrypto does not change its format.
-    // If this test breaks DO NOT JUST UPDATE THE EXPECTED BYTES. Instead, add a local JWK struct
-    // that mirrors the fastcrypto struct, use it in AuthenticatorStateUpdate, and add Into/From
-    // as necessary.
+    // Ensure that the JWK and JwkId structs in fastcrypto do not change formats.
+    // If this test breaks DO NOT JUST UPDATE THE EXPECTED BYTES. Instead, add a local JWK or
+    // JwkId struct that mirrors the fastcrypto struct, use it in AuthenticatorStateUpdate, and
+    // add Into/From as necessary.
     let jwk = JWK {
         kty: "a".to_string(),
         e: "b".to_string(),
@@ -240,7 +244,16 @@ fn test_jwk_compatibility() {
         alg: "d".to_string(),
     };
 
-    let expected_bytes = vec![1, 97, 1, 98, 1, 99, 1, 100];
+    let expected_jwk_bytes = vec![1, 97, 1, 98, 1, 99, 1, 100];
     let jwk_bcs = bcs::to_bytes(&jwk).unwrap();
-    assert_eq!(jwk_bcs, expected_bytes);
+    assert_eq!(jwk_bcs, expected_jwk_bytes);
+
+    let id = JwkId {
+        iss: "abc".to_string(),
+        kid: "def".to_string(),
+    };
+
+    let expected_id_bytes = vec![1, 97, 1, 98, 1, 99, 1, 100];
+    let id_bcs = bcs::to_bytes(&id).unwrap();
+    assert_eq!(id_bcs, expected_id_bytes);
 }
