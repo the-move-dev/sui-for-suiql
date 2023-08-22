@@ -104,6 +104,7 @@ export function PageLayout({ gradient, content, loading, isError }: PageLayoutPr
 				)}
 			</main>
 			<Footer />
+			<UnlockAccountModal />
 		</div>
 	);
 }

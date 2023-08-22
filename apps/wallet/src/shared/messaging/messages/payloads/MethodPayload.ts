@@ -26,6 +26,7 @@ type MethodPayloads = {
 	lockAccountSourceOrAccount: { id: string };
 	unlockAccountSourceOrAccount: { id: string; password?: string };
 	createAccounts:
+		| { type: 'qredo'; id: string }
 		| { type: 'mnemonic-derived'; sourceID: string }
 		| { type: 'imported'; keyPair: ExportedKeypair; password: string }
 		| {

@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useNavigate } from 'react-router-dom';
+import { useOnboardingFormContext } from './ImportAccountsPage';
 import { ImportRecoveryPhraseForm } from '../../components/accounts/ImportRecoveryPhraseForm';
 import { Heading } from '../../shared/heading';
 import { Text } from '_app/shared/text';
 
 export function ImportPassphrasePage() {
 	const navigate = useNavigate();
+	const [, setValues] = useOnboardingFormContext();
 	return (
 		<div className="rounded-20 bg-sui-lightest shadow-wallet-content flex flex-col items-center px-6 py-10 h-full overflow-auto">
 			<Text variant="caption" color="steel-dark" weight="semibold">
@@ -28,15 +30,8 @@ export function ImportPassphrasePage() {
 					cancelButtonText="Cancel"
 					submitButtonText="Add Account"
 					onSubmit={(formValues) => {
-						// NOTE: Depending on how we wire up the business logic for this flow,
-						// we might need to use a Context to share form values between this page
-						// and the following page where you add a password to your account.
-						// eslint-disable-next-line no-console
-						console.log(
-							'TODO: Do something when the user submits the form successfully',
-							formValues,
-						);
 						navigate('/accounts/protect-account');
+						setValues({ ...formValues });
 					}}
 				/>
 			</div>

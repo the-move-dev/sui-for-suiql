@@ -121,6 +121,7 @@ export async function accountSourcesHandleUIMessage(msg: Message, uiConnection: 
 		}
 	}
 	if (isMethodPayload(payload, 'lockAccountSourceOrAccount')) {
+		console.log(payload.args.id);
 		const accountSource = await getAccountSourceByID(payload.args.id);
 		if (accountSource) {
 			await accountSource.lock();

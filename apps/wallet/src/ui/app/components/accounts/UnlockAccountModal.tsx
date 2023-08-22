@@ -25,14 +25,22 @@ type FormValues = z.infer<typeof formSchema>;
 
 type UnlockAccountModalProps = {
 	onClose: () => void;
-	onSuccess: (password: string) => void;
+	onSuccess: () => void;
+	accountId: string;
+	open: boolean;
 };
 
-export function UnlockAccountModal({ onClose, onSuccess }: UnlockAccountModalProps) {
+export function UnlockAccountModal({
+	onClose,
+	onSuccess,
+	accountId,
+	open,
+}: UnlockAccountModalProps) {
 	const {
 		register,
 		handleSubmit,
 		setError,
+		reset,
 		formState: { isSubmitting, isValid },
 	} = useZodForm({
 		mode: 'all',
@@ -44,8 +52,13 @@ export function UnlockAccountModal({ onClose, onSuccess }: UnlockAccountModalPro
 	const backgroundService = useBackgroundClient();
 	const onSubmit = async (formValues: FormValues) => {
 		try {
-			await backgroundService.verifyPassword(formValues.password);
-			await onSuccess(formValues.password);
+			await backgroundService.unlockAccountSourceOrAccount({
+				password: formValues.password,
+				id: accountId,
+			});
+			toast.success('Account unlocked');
+			reset();
+			onSuccess();
 		} catch (e) {
 			toast.error((e as Error).message || 'Wrong password');
 			setError('password', { message: 'Incorrect password' }, { shouldFocus: true });
@@ -53,12 +66,7 @@ export function UnlockAccountModal({ onClose, onSuccess }: UnlockAccountModalPro
 	};
 
 	return (
-		<Dialog
-			defaultOpen
-			onOpenChange={(open) => {
-				if (!open) onClose?.();
-			}}
-		>
+		<Dialog open={open}>
 			<DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
 				<DialogHeader>
 					<DialogTitle>Enter Account Password</DialogTitle>

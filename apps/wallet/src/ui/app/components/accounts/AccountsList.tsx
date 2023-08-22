@@ -3,10 +3,10 @@
 
 import { Filter16, Plus12 } from '@mysten/icons';
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { AccountListItem } from './AccountListItem';
 import { FooterLink } from './FooterLink';
-import { UnlockAccountModal } from './UnlockAccountModal';
+import { useUnlockAccount } from './UnlockAccountContext';
 import { useActiveAccount } from '../../hooks/useActiveAccount';
 import { useBackgroundClient } from '../../hooks/useBackgroundClient';
 import { Heading } from '../../shared/heading';
@@ -26,13 +26,7 @@ export function AccountsList() {
 		[accounts, activeAccount?.id],
 	);
 
-	// todo: replace this with a real flow
-	const [unlockModalOpen, setUnlockModalOpen] = useState(false);
-	const handleUnlockAccount = () => {
-		setUnlockModalOpen(true);
-	};
-
-	const close = () => setUnlockModalOpen(false);
+	const { unlockAccount, lockAccount } = useUnlockAccount();
 
 	const handleSelectAccount = async (accountID: string) => {
 		const account = accounts?.find((a) => a.id === accountID);
@@ -44,9 +38,9 @@ export function AccountsList() {
 			await backgroundClient.selectAccount(accountID);
 		}
 	};
-	if (!accounts || !activeAccount) {
-		return null;
-	}
+
+	if (!accounts || !activeAccount) return null;
+
 	return (
 		<div className="bg-gradients-graph-cards flex flex-col rounded-xl p-4 gap-5 border border-solid border-hero/10 w-full">
 			<Heading variant="heading5" weight="semibold" color="steel-darker">
@@ -65,7 +59,8 @@ export function AccountsList() {
 							<div>
 								<AccountListItem
 									address={activeAccount.address}
-									handleUnlockAccount={handleUnlockAccount}
+									handleUnlockAccount={() => unlockAccount(activeAccount.id)}
+									handleLockAccount={() => lockAccount(activeAccount.id)}
 								/>
 							</div>
 						</ToggleGroup.Item>
@@ -80,7 +75,8 @@ export function AccountsList() {
 											<div>
 												<AccountListItem
 													address={account.address}
-													handleUnlockAccount={handleUnlockAccount}
+													handleUnlockAccount={() => unlockAccount(account.id)}
+													handleLockAccount={() => lockAccount(account.id)}
 												/>
 											</div>
 										</ToggleGroup.Item>
@@ -96,7 +92,6 @@ export function AccountsList() {
 				<FooterLink color="steelDarker" icon={<Filter16 />} to="/accounts/manage" text="Manage" />
 				<FooterLink color="steelDarker" icon={<Plus12 />} to="/accounts/add-account" text="Add" />
 			</div>
-			{unlockModalOpen ? <UnlockAccountModal onClose={close} onSuccess={close} /> : null}
 		</div>
 	);
 }

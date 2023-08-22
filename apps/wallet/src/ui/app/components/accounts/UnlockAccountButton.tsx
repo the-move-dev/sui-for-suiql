@@ -1,8 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useState } from 'react';
-import { UnlockAccountModal } from './UnlockAccountModal';
+import { useUnlockAccount } from './UnlockAccountContext';
 import { useUnlockMutation } from '../../hooks/useUnlockMutation';
 import { Button } from '../../shared/ButtonUI';
 import { SocialButton } from '../../shared/SocialButton';
@@ -19,23 +18,11 @@ export function UnlockAccountButton({
 }: UnlockAccountButtonProps) {
 	const { id, isPasswordUnlockable } = account;
 	const unlockMutation = useUnlockMutation();
-	const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
-	if (isPasswordModalVisible) {
-		return (
-			<UnlockAccountModal
-				onClose={() => setIsPasswordModalVisible(false)}
-				onSuccess={(password: string) => unlockMutation.mutateAsync({ id, password })}
-			/>
-		);
-	}
+
+	const { unlockAccount } = useUnlockAccount();
+
 	if (isPasswordUnlockable) {
-		return (
-			<Button
-				text={title}
-				onClick={() => setIsPasswordModalVisible(true)}
-				disabled={isPasswordModalVisible}
-			/>
-		);
+		return <Button text={title} onClick={() => unlockAccount(id)} />;
 	}
 	if (isZkAccountSerializedUI(account)) {
 		return (

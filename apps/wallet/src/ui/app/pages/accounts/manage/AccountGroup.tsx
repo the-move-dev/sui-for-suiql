@@ -3,20 +3,19 @@
 
 import { ArrowBgFill16, Plus12 } from '@mysten/icons';
 import * as CollapsiblePrimitive from '@radix-ui/react-collapsible';
-import { type AccountType, type SerializedUIAccount } from '_src/background/accounts/Account';
+import { toast } from 'react-hot-toast';
+import { type AccountSourceType } from '_src/background/account-sources/AccountSource';
+import { type SerializedUIAccount } from '_src/background/accounts/Account';
 import { AccountItem } from '_src/ui/app/components/accounts/AccountItem';
-import { AccountActions } from '_src/ui/app/components/menu/content/AccountActions';
+import { useCreateAccountsMutation } from '_src/ui/app/hooks/useCreateAccountMutation';
 import { Heading } from '_src/ui/app/shared/heading';
 import { Text } from '_src/ui/app/shared/text';
 import { ButtonOrLink, type ButtonOrLinkProps } from '_src/ui/app/shared/utils/ButtonOrLink';
 
 // todo: these will likely be shared in various parts of the UI
-const labels: Record<AccountType, string> = {
-	'mnemonic-derived': 'Passphrase Derived',
-	ledger: 'Ledger',
-	imported: 'Imported',
+const labels: Record<AccountSourceType, string> = {
+	mnemonic: 'Passphrase Derived',
 	qredo: 'Qredo',
-	zk: 'zkLogin',
 };
 
 // todo: we probbaly have some duplication here with the various FooterLink / ButtonOrLink
@@ -51,10 +50,13 @@ function AccountFooter() {
 export function AccountGroup({
 	accounts,
 	type,
+	accountSource,
 }: {
 	accounts: SerializedUIAccount[];
-	type: AccountType;
+	type: AccountSourceType;
+	accountSource: string;
 }) {
+	const createAccountMutation = useCreateAccountsMutation();
 	return (
 		<CollapsiblePrimitive.Root defaultOpen={true} asChild>
 			<div className="flex flex-col gap-4 h-full w-full ">
@@ -66,14 +68,24 @@ export function AccountGroup({
 						</Heading>
 						<div className="h-px bg-gray-45 flex flex-1 flex-shrink-0" />
 						<ButtonOrLink
-							onClick={(e) => {
-								// prevent button click from collapsing section
+							onClick={async (e) => {
 								e.stopPropagation();
-								// todo: implement me
+								try {
+									// todo: support more account types
+									if (type === 'mnemonic') {
+										createAccountMutation.mutate({
+											sourceID: accountSource,
+											type: 'mnemonic-derived',
+										});
+									}
+								} catch (e) {
+									toast.error((e as Error).message || 'Failed to create new account');
+								}
 							}}
 							className="items-center justify-center gap-0.5 cursor-pointer appearance-none uppercase flex bg-transparent border-0 outline-none text-hero hover:text-hero-darkest"
 						>
 							<Plus12 />
+
 							<Text variant="bodySmall" weight="semibold">
 								New
 							</Text>
@@ -92,7 +104,7 @@ export function AccountGroup({
 								/>
 							);
 						})}
-						<AccountActions account={accounts[0]} />
+						{/* <AccountActions account={accounts[0]} /> */}
 					</div>
 				</CollapsiblePrimitive.CollapsibleContent>
 			</div>
