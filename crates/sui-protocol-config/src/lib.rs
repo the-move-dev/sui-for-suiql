@@ -11,7 +11,7 @@ use tracing::{info, warn};
 
 /// The minimum and maximum protocol versions supported by this build.
 const MIN_PROTOCOL_VERSION: u64 = 1;
-const MAX_PROTOCOL_VERSION: u64 = 21;
+const MAX_PROTOCOL_VERSION: u64 = 22;
 
 // Record history of protocol version allocations here:
 //
@@ -65,6 +65,11 @@ const MAX_PROTOCOL_VERSION: u64 = 21;
 // Version 20: Enabling the flag `narwhal_new_leader_election_schedule` for the new narwhal leader
 //             schedule algorithm for enhanced fault tolerance and sets the bad node stake threshold
 //             value. Both values are set for all the environments except mainnet.
+// Version 21: ZKLogin supported provider list in devnet and testnet
+// Version 22: Max number of publish or upgrade commands allowed and checked
+//             at signing time.
+//             New execution layer version. Gas charges for upgrades and reworked integration
+//             with the Move VM
 
 #[derive(Copy, Clone, Debug, Hash, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProtocolVersion(u64);
@@ -257,6 +262,11 @@ struct FeatureFlags {
     // A list of supported OIDC providers that can be used for zklogin.
     #[serde(skip_serializing_if = "is_empty")]
     zklogin_supported_providers: BTreeSet<String>,
+
+    // Max number of publish or upgrade commands allowed in a
+    // programmable transaction block.
+    #[serde(skip_serializing_if = "is_zero")]
+    max_publish_or_upgrade_per_ptb: u64,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -265,6 +275,10 @@ fn is_false(b: &bool) -> bool {
 fn is_empty(b: &BTreeSet<String>) -> bool {
     b.is_empty()
 }
+fn is_zero(b: &u64) -> bool {
+    *b == 0
+}
+
 /// Ordering mechanism for transactions in one Narwhal consensus output.
 #[derive(Default, Copy, Clone, Serialize, Debug)]
 pub enum ConsensusTransactionOrdering {
@@ -761,6 +775,10 @@ impl ProtocolConfig {
 
     pub fn package_upgrades_supported(&self) -> bool {
         self.feature_flags.package_upgrades
+    }
+
+    pub fn max_publish_or_upgrade_per_ptb(&self) -> u64 {
+        self.feature_flags.max_publish_or_upgrade_per_ptb
     }
 
     pub fn check_commit_root_state_digest_supported(&self) -> bool {
@@ -1374,7 +1392,6 @@ impl ProtocolConfig {
 
                 cfg
             }
-
             21 => {
                 let mut cfg = Self::get_for_version_impl(version - 1, chain);
 
@@ -1385,6 +1402,11 @@ impl ProtocolConfig {
                         "Twitch".to_string(),
                     ]);
                 }
+                cfg
+            }
+            22 => {
+                let mut cfg = Self::get_for_version_impl(version - 1, chain);
+                cfg.feature_flags.max_publish_or_upgrade_per_ptb = 5;
                 cfg
             }
             // Use this template when making changes:

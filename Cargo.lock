@@ -9393,6 +9393,7 @@ dependencies = [
  "anyhow",
  "bcs",
  "leb128",
+ "linked-hash-map",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier-suivm",
