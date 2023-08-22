@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use diesel::{Insertable, Queryable};
-use jsonrpsee::core::__reexports::serde::Deserialize;
-
-use sui_json_rpc_types::{EndOfEpochInfo, EpochInfo};
 
 use crate::errors::IndexerError;
 use crate::models::system_state::DBValidatorSummary;
 use crate::schema::epochs;
+use serde::Deserialize;
+use sui_json_rpc_types::{EndOfEpochInfo, EpochInfo};
 
 #[derive(Queryable, Insertable, Debug, Clone, Default)]
 #[diesel(table_name = epochs)]

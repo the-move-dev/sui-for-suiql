@@ -5,9 +5,11 @@ use clap::Parser;
 use tracing::{error, info};
 
 use sui_indexer::errors::IndexerError;
+use sui_indexer::indexer_v2::IndexerV2;
 use sui_indexer::metrics::IndexerMetrics;
 use sui_indexer::start_prometheus_server;
 use sui_indexer::store::PgIndexerStore;
+use sui_indexer::store::PgIndexerStoreV2;
 use sui_indexer::utils::reset_database;
 use sui_indexer::{get_pg_pool_connection, new_pg_connection_pool, Indexer, IndexerConfig};
 
@@ -82,7 +84,9 @@ async fn main() -> Result<(), IndexerError> {
             IndexerError::PostgresResetError(db_err_msg)
         })?;
     }
-    let store = PgIndexerStore::new(blocking_cp, indexer_metrics.clone());
+    // let store = PgIndexerStore::new(blocking_cp, indexer_metrics.clone());
+    let store = PgIndexerStoreV2::new(blocking_cp, indexer_metrics.clone());
 
-    Indexer::start(&indexer_config, &registry, store, indexer_metrics, None).await
+    // Indexer::start(&indexer_config, &registry, store, indexer_metrics, None).await
+    IndexerV2::start(&indexer_config, &registry, store, indexer_metrics, None).await
 }

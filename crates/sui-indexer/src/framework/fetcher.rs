@@ -81,9 +81,15 @@ impl CheckpointFetcher {
             self.last_downloaded_checkpoint =
                 Some(*checkpoint.checkpoint_summary.sequence_number());
 
-            info!(
+            // FIXME
+            tracing::debug!(
                 checkpoint = checkpoint.checkpoint_summary.sequence_number(),
-                "successfully downloaded checkpoint"
+                "successfully downloaded checkpoint. Objects: {:?}",
+                checkpoint
+                    .objects
+                    .iter()
+                    .map(|o| (o.id(), o.version()))
+                    .collect::<Vec<_>>()
             );
 
             self.sender

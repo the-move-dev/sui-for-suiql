@@ -38,13 +38,17 @@ pub mod apis;
 pub mod errors;
 pub mod framework;
 mod handlers;
+pub mod indexer_v2;
 pub mod metrics;
 pub mod models;
+pub mod models_v2;
 pub mod processors;
 pub mod schema;
+pub mod schema_v2;
 pub mod store;
 pub mod test_utils;
 pub mod types;
+pub mod types_v2;
 pub mod utils;
 
 pub type PgConnectionPool = diesel::r2d2::Pool<ConnectionManager<PgConnection>>;

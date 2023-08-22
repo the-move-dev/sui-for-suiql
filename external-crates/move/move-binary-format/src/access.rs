@@ -208,6 +208,13 @@ pub trait ModuleAccess: Sync {
             name == self.identifier_at(handle.name)
         })
     }
+
+    fn foo(&self) -> Vec<&IdentStr> {
+        self.struct_defs().iter().map(|def| {
+            let handle = self.struct_handle_at(def.struct_handle);
+            self.identifier_at(handle.name)
+        }).collect::<Vec<_>>()
+    }
 }
 
 /// Represents accessors for a compiled script.

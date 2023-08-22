@@ -566,6 +566,7 @@ impl StructLayoutBuilder {
             Err(_) | Ok(None) => bail!("Could not find module"),
             Ok(Some(m)) => m,
         };
+        // println!("build_from_name  {:?}, {:?} struct identifiers: {:?}", declaring_module, name, module.borrow().foo());
         let def = module
             .borrow()
             .find_struct_def_by_name(name)
