@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 module sui::ecdsa_k1 {
-
-    /// Error if the public key cannot be recovered from the signature. 
+    /// Error if the public key cannot be recovered from the signature.
     const EFailToRecoverPubKey: u64 = 0;
 
     /// Error if the signature is invalid.
     const EInvalidSignature: u64 = 1;
-    
-    /// Hash function name that are valid for ecrecover and secp256k1_verify. 
+
+    /// Hash function name that are valid for ecrecover and secp256k1_verify.
     const KECCAK256: u8 = 0;
     const SHA256: u8 = 1;
-    
+
     /// @param signature: A 65-bytes signature in form (r, s, v) that is signed using
     /// Secp256k1. Reference implementation on signature generation using RFC6979:
     /// https://github.com/MystenLabs/narwhal/blob/5d6f6df8ccee94446ff88786c0dbbc98be7cfc09/crypto/src/secp256k1.rs
