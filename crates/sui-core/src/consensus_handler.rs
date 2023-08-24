@@ -16,6 +16,7 @@ use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use fastcrypto::hash::Hash as _Hash;
 use fastcrypto::traits::ToFromBytes;
+use fastcrypto_zkp::bn254::zk_login::{JwkId, JWK};
 use lru::LruCache;
 use mysten_metrics::{monitored_scope, spawn_monitored_task};
 use narwhal_config::Committee;
@@ -143,6 +144,7 @@ impl<T: ParentSync + Send + Sync> ExecutionState for ConsensusHandler<T> {
 
         let mut sequenced_transactions = Vec::new();
         let mut end_of_publish_transactions = Vec::new();
+        let mut jwk_votes = Vec::new();
 
         let mut bytes = 0usize;
         let round = consensus_output.sub_dag.leader_round();
@@ -308,12 +310,36 @@ impl<T: ParentSync + Send + Sync> ExecutionState for ConsensusHandler<T> {
                 if verified_transaction.0.is_end_of_publish() {
                     end_of_publish_transactions.push(verified_transaction);
                 } else if verified_transaction.0.is_jwk_fetched() {
-                    new_jwks.push(verified_transaction);
+                    jwk_votes.push(verified_transaction);
                 } else {
                     sequenced_transactions.push(verified_transaction);
                 }
             }
         }
+
+        let jwks: Vec<_> = jwk_votes
+            .into_iter()
+            .map(|tx| {
+                let sender = tx.0.certificate_author;
+                let (id, jwk) = tx.into_jwk().expect("expected jwk transaction");
+                (sender, id, jwk)
+            })
+            .collect();
+
+        let new_active_jwks = self.epoch_store.record_jwk_votes(jwks);
+
+        /*
+        let mut new_jwks = HashMap::new();
+        for tx in jwk_votes {
+            let sender = tx.0.certificate_author;
+            let (id, jwk) = tx.into_jwk().expect("expected jwk transaction");
+            if self.epoch_store.record_jwk_vote(sender, id, jwk) {
+                if let Some(prev_jwk) = new_jwks.insert(id, jwk) {
+                    error!("duplicate jwk for id {:?}: {:?} vs {:?}", id, jwk, prev_jwk);
+                }
+            }
+        }
+        */
 
         // TODO: make the reordering algorithm richer and depend on object hotness as well.
         // Order transactions based on their gas prices. System transactions without gas price
@@ -570,6 +596,16 @@ impl SequencedConsensusTransaction {
             SequencedConsensusTransactionKind::System(txn) if txn.contains_shared_object() => {
                 Some(txn.data())
             }
+            _ => None,
+        }
+    }
+
+    pub fn into_jwk(self) -> Option<(JwkId, JWK)> {
+        match self.transaction {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::NewJWKFetched(id, jwk),
+                ..
+            }) => Some((id, jwk)),
             _ => None,
         }
     }

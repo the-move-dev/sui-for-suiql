@@ -7,11 +7,12 @@ use futures::future::{join_all, select, Either};
 use futures::FutureExt;
 use itertools::izip;
 use narwhal_executor::ExecutionIndices;
+use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use parking_lot::{Mutex, RwLockReadGuard, RwLockWriteGuard};
 use rocksdb::Options;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{btree_map::Entry, BTreeMap, HashMap, HashSet};
 use std::future::Future;
 use std::iter;
 use std::path::{Path, PathBuf};
@@ -25,8 +26,8 @@ use sui_types::digests::ChainIdentifier;
 use sui_types::error::{SuiError, SuiResult};
 use sui_types::signature::GenericSignature;
 use sui_types::transaction::{
-    CertifiedTransaction, SenderSignedData, SharedInputObject, TransactionDataAPI,
-    VerifiedCertificate, VerifiedSignedTransaction,
+    AuthenticatorStateUpdate, CertifiedTransaction, SenderSignedData, SharedInputObject,
+    TransactionDataAPI, VerifiedCertificate, VerifiedSignedTransaction,
 };
 use tracing::{debug, error, info, trace, warn};
 use typed_store::rocks::{
@@ -49,7 +50,7 @@ use crate::epoch::epoch_metrics::EpochMetrics;
 use crate::epoch::reconfiguration::ReconfigState;
 use crate::module_cache_metrics::ResolverMetrics;
 use crate::signature_verifier::*;
-use crate::stake_aggregator::StakeAggregator;
+use crate::stake_aggregator::{GenericMultiStakeAggregator, StakeAggregator};
 use move_bytecode_utils::module_cache::SyncModuleCache;
 use mysten_common::sync::notify_once::NotifyOnce;
 use mysten_common::sync::notify_read::NotifyRead;
@@ -98,6 +99,8 @@ impl CertTxGuard {
     pub fn release(self) {}
     pub fn commit_tx(self) {}
 }
+
+type JwkAggregator = GenericMultiStakeAggregator<(JwkId, JWK), true>;
 
 pub enum ConsensusCertificateResult {
     /// The consensus message was ignored (e.g. because it has already been processed).
@@ -185,7 +188,7 @@ pub struct AuthorityPerEpochStore {
     chain_identifier: ChainIdentifier,
 
     /// aggregator for JWK votes
-    jwk_aggregator: Arc<StakeAggregator<(JwkId, JWK), true>>,
+    jwk_aggregator: OnceCell<Arc<Mutex<JwkAggregator>>>,
 }
 
 /// AuthorityEpochTables contains tables that contain data that is only valid within an epoch.
@@ -313,10 +316,11 @@ pub struct AuthorityEpochTables {
     pub(crate) executed_transactions_to_checkpoint:
         DBMap<TransactionDigest, CheckpointSequenceNumber>,
 
-    pending_jwks: DBMap<(JwkId, AuthorityName), JWK>,
+    /// JWKs that have been voted for by one or more authorities but are not yet active.
+    pending_jwks: DBMap<(u64, AuthorityName, JwkId, JWK), ()>,
 
-    /// Map from JwkId (iss, kid) to the fetched JWK for that key.
-    oauth_provider_jwk: DBMap<JwkId, JWK>,
+    /// JWKs that are currently available for zklogin authentication.
+    active_jwks: DBMap<JwkId, (u64, JWK)>,
 }
 
 fn signed_transactions_table_default_config() -> DBOptions {
@@ -397,14 +401,6 @@ impl AuthorityEpochTables {
     pub fn get_last_consensus_index(&self) -> SuiResult<Option<ExecutionIndicesWithHash>> {
         Ok(self.last_consensus_index.get(&LAST_CONSENSUS_INDEX_ADDR)?)
     }
-
-    fn load_oauth_provider_jwk(&self) -> SuiResult<HashMap<JwkId, Arc<JWK>>> {
-        Ok(self
-            .oauth_provider_jwk
-            .unbounded_iter()
-            .map(|(k, v)| (k, Arc::new(v)))
-            .collect())
-    }
 }
 
 pub(crate) const MUTEX_TABLE_SIZE: usize = 1024;
@@ -466,9 +462,8 @@ impl AuthorityPerEpochStore {
             expensive_safety_check_config,
         );
 
-        let oauth_provider_jwk = tables
-            .load_oauth_provider_jwk()
-            .expect("Load oauth provider jwk at initialization cannot fail");
+        todo!("load valid jwks from authenticator state object");
+        let active_jwks = store.load_active_jwks();
 
         let zklogin_env = match chain_identifier.chain() {
             Chain::Mainnet => ZkLoginEnv::Prod,
@@ -497,6 +492,7 @@ impl AuthorityPerEpochStore {
                 .flags()
                 .contains(&EpochFlag::InMemoryCheckpointRoots));
         }
+
         let s = Arc::new(Self {
             committee,
             protocol_config,
@@ -519,6 +515,7 @@ impl AuthorityPerEpochStore {
             epoch_start_configuration,
             execution_component,
             chain_identifier,
+            jwk_aggregator: Default::default(),
         });
         s.update_buffer_stake_metric();
         s
@@ -1222,9 +1219,87 @@ impl AuthorityPerEpochStore {
         self.tables.authority_capabilities.values().collect()
     }
 
-    pub fn record_jwk(&self, sender: AuthorityName, id: &JwkId, jwk: &Jwk) -> SuiResult {
-        self.tables.jwks.insert(id, jwk)?;
-        Ok(())
+    /// Given a set of votes for new jwks, record the votes, and return any jwks that have become
+    /// newly active based on these votes.
+    pub fn record_jwk_votes(
+        &self,
+        round: u64,
+        votes: Vec<(AuthorityName, JwkId, JWK)>,
+    ) -> SuiResult<Vec<(JwkId, JWK)>> {
+        let jwk_aggregator = self.get_or_recover_jwk_aggregator(round);
+        let jwk_aggregator = jwk_aggregator.lock();
+
+        let mut active = BTreeMap::new();
+
+        let mut batch = self.db_batch();
+
+        for (authority, id, jwk) in votes.into_iter() {
+            batch.insert_batch(
+                &self.tables.pending_jwks,
+                std::iter::once(((round, authority, id, jwk), ())),
+            );
+
+            let insert_result = jwk_aggregator.insert(authority, (id, jwk));
+            if insert_result.is_quorum_reached() {
+                match active.entry(id) {
+                    Entry::Occupied(prev_jwk) => {
+                        if jwk != prev_jwk {
+                            error!("multiple JWKs for id {:?} voted for by authorities. previous: {:?} ignoring new value: {:?}", id, prev_jwk, jwk);
+                            continue;
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(jwk);
+                    }
+                }
+            }
+        }
+
+        // filter out jwks that became active in previous rounds.
+        let new_active: Vec<_> = active
+            .into_iter()
+            .filter(|(id, _)| {
+                if let Some((active_round, _)) = self.active_jwks.get(id).expect("read cannot fail")
+                {
+                    if active_round < round {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .collect();
+
+        batch.insert_batch(
+            &self.tables.active_jwks,
+            new_active.iter().map(|(id, jwk)| (id, (round, jwk))),
+        );
+
+        batch.write()?;
+
+        Ok(new_active)
+    }
+
+    fn get_or_recover_jwk_aggregator(&self, round: u64) -> Arc<Mutex<Mutex<JwkAggregator>>> {
+        self.jwk_aggregator
+            .get_or_init(|| {
+                let pending_jwks: Vec<_> = self
+                    .tables
+                    .pending_jwks
+                    .unbounded_iter()
+                    .seek_to_first()
+                    .filter(|(key, _)| key.0 < round)
+                    .map(|((_, authority, id, jwk), _)| (authority, id, jwk))
+                    .collect();
+
+                let mut jwk_aggregator = JwkAggregator::new(self.committee.clone());
+                for (authority, id, jwk) in pending_jwks {
+                    jwk_aggregator.insert(authority, (id, jwk));
+                }
+
+                jwk_aggregator
+            })
+            .clone()
     }
 
     /// Caller is responsible to call consensus_message_processed before this method
@@ -2196,6 +2271,12 @@ impl AuthorityPerEpochStore {
             .oauth_provider_jwk
             .contains_key(jwk_id)
             .expect("read cannot fail")
+    }
+
+    pub fn update_authenticator_state(&self, update: &AuthenticatorStateUpdate) {
+        for (id, jwk) in &update.new_active_jwks {
+            self.signature_verifier.insert_oauth_jwk(id, jwk);
+        }
     }
 
     // TODO: should be pub(crate) when it is inserted only from consensus

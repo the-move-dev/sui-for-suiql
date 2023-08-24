@@ -272,3 +272,26 @@ where
             .collect()
     }
 }
+
+/// Like MultiStakeAggregator, but for counting votes for a generic value instead of an envelope, in
+/// scenarios where byzantine validators may submit multiple votes for different values.
+pub struct GenericMultiStakeAggregator<K, const STRENGTH: bool> {
+    committee: Arc<Committee>,
+    stake_maps: HashMap<K, StakeAggregator<(), STRENGTH>>,
+}
+
+impl<K, const STRENGTH: bool> GenericMultiStakeAggregator<K, STRENGTH> {
+    pub fn new(committee: Arc<Committee>) -> Self {
+        Self {
+            committee,
+            stake_maps: Default::default(),
+        }
+    }
+
+    pub fn insert(&mut self, authority: AuthorityName, k: K) -> InsertResult<()> {
+        self.stake_maps
+            .entry(k)
+            .or_insert_with(|| StakeAggregator::new(self.committee.clone()))
+            .insert_generic(authority, ())
+    }
+}

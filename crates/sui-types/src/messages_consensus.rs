@@ -28,8 +28,15 @@ pub struct ConsensusCommitPrologue {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum AuthenticatorStateUpdate {
-    AddOAuthProviderContentV1(JWK),
+pub struct AuthenticatorStateUpdate {
+    /// Epoch of the authenticator state update transaction
+    pub epoch: u64,
+    /// Consensus round of the authenticator state update
+    pub round: u64,
+    /// newly active jwks
+    pub new_active_jwks: Vec<(JwkId, JWK)>,
+    // to version this struct, do not add new fields. Instead, add a AuthenticatorStateUpdateV2 to
+    // TransactionKind.
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
