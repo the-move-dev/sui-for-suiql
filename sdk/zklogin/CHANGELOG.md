@@ -1,5 +1,12 @@
 # @mysten/zklogin
 
+## 0.1.2
+
+### Patch Changes
+
+- d0750ea0f: rename pin to salt
+- a82600f2d: fix nonce calculation
+
 ## 0.1.1
 
 ### Patch Changes
