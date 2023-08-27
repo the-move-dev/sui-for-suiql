@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
+use move_bytecode_utils::module_cache::SyncModuleCache;
 use prometheus::{Histogram, IntCounter};
 
 use move_core_types::identifier::Identifier;
@@ -34,9 +35,12 @@ use crate::models::transaction_index::{ChangedObject, InputObject, MoveCall, Rec
 use crate::models::transactions::Transaction;
 use crate::types::CheckpointTransactionBlockResponse;
 
+use super::module_resolver::IndexerModuleResolver;
+
 #[async_trait]
 pub trait IndexerStore {
     type ModuleCache;
+
 
     async fn get_latest_tx_checkpoint_sequence_number(&self) -> Result<i64, IndexerError>;
     async fn get_latest_object_checkpoint_sequence_number(&self) -> Result<i64, IndexerError>;
@@ -257,7 +261,7 @@ pub trait IndexerStore {
 
     async fn get_current_epoch(&self) -> Result<EpochInfo, IndexerError>;
 
-    fn module_cache(&self) -> &Self::ModuleCache;
+    fn module_cache(&self) -> &SyncModuleCache<IndexerModuleResolver>;
 
     fn indexer_metrics(&self) -> &IndexerMetrics;
 

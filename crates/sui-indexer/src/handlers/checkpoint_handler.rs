@@ -3,6 +3,7 @@
 
 use fastcrypto::traits::ToFromBytes;
 use itertools::Itertools;
+use move_bytecode_utils::module_cache::GetModule;
 use move_core_types::ident_str;
 use mysten_metrics::{get_metrics, spawn_monitored_task};
 use std::collections::HashMap;
@@ -411,7 +412,7 @@ where
             db_transactions.push(db_txn);
 
             db_events.extend(events.iter().flat_map(|events| &events.data).map(|event| {
-                Event::from_sui_event(event, transaction_digest, checkpoint_summary.timestamp_ms)
+                Event::from_sui_event(event, transaction_digest, checkpoint_summary.timestamp_ms, state.module_cache())
             }));
 
             // Input Objects
@@ -818,7 +819,7 @@ where
         let index_timer = self.metrics.checkpoint_index_latency.start_timer();
 
         let object_changes =
-            Self::index_checkpoint_objects(self.state.clone(), checkpoint_data).await;
+            Self::index_checkpoint_objects(self.state.clone(), self.state.module_cache(), checkpoint_data).await;
         index_timer.stop_and_record();
 
         self.object_indexing_sender
@@ -842,6 +843,7 @@ where
 {
     async fn index_checkpoint_objects(
         packages_handler: S,
+        module_cache: &impl GetModule,
         data: &CheckpointData,
     ) -> Vec<TransactionObjectChanges> {
         // Index packages
@@ -869,7 +871,7 @@ where
             .iter()
             .map(|o| ((o.id(), o.version()), o))
             .collect();
-
+        
         data.transactions
             .iter()
             .map(|(_, fx, _)| {
@@ -878,7 +880,7 @@ where
                     .into_iter()
                     .map(|(oref, _owner, kind)| {
                         let object = objects.get(&(oref.0, oref.1)).unwrap();
-                        crate::models::objects::Object::new(epoch, checkpoint, kind, object)
+                        crate::models::objects::Object::new(epoch, checkpoint, kind, object, module_cache)
                     })
                     .collect();
 

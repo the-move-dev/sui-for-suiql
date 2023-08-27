@@ -108,6 +108,8 @@ pub struct IndexerConfig {
     // NOTE: experimental only, do not use in production.
     #[clap(long)]
     pub skip_db_commit: bool,
+    #[clap(long)]
+    pub store_parsed_content: bool,
 }
 
 impl IndexerConfig {
@@ -162,6 +164,7 @@ impl Default for IndexerConfig {
             fullnode_sync_worker: true,
             rpc_server_worker: true,
             skip_db_commit: false,
+            store_parsed_content: false,
         }
     }
 }

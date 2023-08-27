@@ -30,6 +30,7 @@ pub struct Event {
     pub event_type: String,
     pub event_time_ms: Option<i64>,
     pub event_bcs: Vec<u8>,
+    pub parsed_json: Option<String>,
 }
 
 impl From<SuiEvent> for Event {
@@ -44,6 +45,7 @@ impl From<SuiEvent> for Event {
             event_type: se.type_.to_string(),
             event_time_ms: se.timestamp_ms.map(|t| t as i64),
             event_bcs: se.bcs,
+            parsed_json: None,
         }
     }
 }
@@ -53,7 +55,9 @@ impl Event {
         event: &sui_types::event::Event,
         transaction_digest: &TransactionDigest,
         event_timestamp_ms: u64,
+        module_cache: &impl GetModule,
     ) -> Self {
+        let parsed_json = Event::parse_event_json(event, module_cache).unwrap_or(None);
         Self {
             id: None,
             transaction_digest: transaction_digest.base58_encode(),
@@ -64,7 +68,20 @@ impl Event {
             event_type: event.type_.to_string(),
             event_time_ms: Some(event_timestamp_ms as i64),
             event_bcs: event.contents.clone(),
+            parsed_json: parsed_json
         }
+    }
+
+    pub fn parse_event_json(event: &sui_types::event::Event, module_cache: &impl GetModule) -> Result<Option<String>, IndexerError> {
+        let layout = MoveObject::get_layout_from_struct_tag(
+            event.type_.clone(),
+            ObjectFormatOptions::default(),
+            module_cache,
+        )?;
+        let move_object = MoveStruct::simple_deserialize(&event.contents.clone(), &layout)
+            .map_err(|e| IndexerError::SerdeError(e.to_string()))?;
+        let parsed_json = SuiMoveStruct::from(move_object).to_json_value().to_string();
+        Ok(Some(parsed_json))
     }
 
     pub fn try_into(self, module_cache: &impl GetModule) -> Result<SuiEvent, IndexerError> {
